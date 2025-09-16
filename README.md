@@ -40,3 +40,7 @@ Some of the main repositories include:
 
 OpenDAoC is licensed under the [GNU General Public License (GPL)](https://choosealicense.com/licenses/gpl-3.0/) v3 to serve the DAoC community and promote open-source development.  
 See the [LICENSE](LICENSE) file for more details.
+
+## DaoC-Code-Bots
+- This fork is focusing on adding the feature for working player-controlled(or influenced) bots within the DaoC world that will function like players and are owned by a player.
+- To build bot (Npc) that can join the players group, follow, and follow commands
