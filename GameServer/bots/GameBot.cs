@@ -796,10 +796,12 @@ namespace DOL.GS
 
         #region Constructor
 
-        public GameBot(GamePlayer owner, byte classId, string name = null)
+        public GameBot(GamePlayer owner, byte classId, string name = null, byte raceId = 0, byte genderId = 0)
         {
             Owner = owner ?? throw new ArgumentNullException(nameof(owner));
             ClassId = classId;
+            RaceId = raceId;
+            GenderId = genderId;
             ClassName = BotManager.GetClassNameById(classId);
             InternalID = Guid.NewGuid().ToString();
             _dummyClient = new BotDummyClient();
@@ -893,20 +895,41 @@ namespace DOL.GS
             if (CharacterClass == null)
                 return;
 
-            // Pick a random eligible race for this class
             var eligibleRaces = CharacterClass.EligibleRaces;
-            if (eligibleRaces != null && eligibleRaces.Count > 0)
+            eGender gender = GenderId == 1 ? eGender.Female : eGender.Male;
+
+            if (RaceId != 0 && eligibleRaces != null)
             {
+                // Use the user-provided race if it's eligible for this class
+                var requestedRace = eligibleRaces.FirstOrDefault(r => (byte)r.ID == RaceId);
+                if (requestedRace != null)
+                {
+                    Race = (short)requestedRace.ID;
+                    Model = (ushort)requestedRace.GetModel(gender);
+                    Gender = gender;
+                }
+                else
+                {
+                    // Provided race not eligible — fall back to random
+                    PlayerRace playerRace = eligibleRaces[Util.Random(eligibleRaces.Count - 1)];
+                    Race = (short)playerRace.ID;
+                    Model = (ushort)playerRace.GetModel(gender);
+                    Gender = gender;
+                }
+            }
+            else if (eligibleRaces != null && eligibleRaces.Count > 0)
+            {
+                // No race specified — pick random eligible race
                 PlayerRace playerRace = eligibleRaces[Util.Random(eligibleRaces.Count - 1)];
                 Race = (short)playerRace.ID;
-                Model = (ushort)playerRace.GetModel(owner.Gender);
-                Gender = owner.Gender;
+                Model = (ushort)playerRace.GetModel(gender);
+                Gender = gender;
             }
             else
             {
                 Race = owner.Race;
                 Model = owner.Model;
-                Gender = owner.Gender;
+                Gender = gender;
             }
 
             // Determine realm from class

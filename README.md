@@ -98,3 +98,29 @@ Commands that take `[name]` are optional -- if omitted, the command targets your
 **Hibernia:** Bard (48), Blademaster (43), Champion (45), Druid (47), Eldritch (40), Enchanter (41), Hero (44), Mentalist (42), Nightshade (49), Ranger (50), Valewalker (56), Warden (46)
 
 **Midgard:** Berserker (31), Bonedancer (30), Healer (26), Hunter (25), Runemaster (29), Savage (32), Shadowblade (23), Shaman (28), Skald (24), Spiritmaster (27), Thane (21), Warrior (22)
+
+### Race IDs (Quick Reference)
+
+| ID | Race | Realm |
+|----|------|-------|
+| 1 | Briton | Albion |
+| 2 | Avalonian | Albion |
+| 3 | Highlander | Albion |
+| 4 | Saracen | Albion |
+| 13 | Inconnu | Albion |
+| 16 | Half Ogre | Albion |
+| 19 | Minotaur (Korazh) | Albion |
+| 5 | Norseman | Midgard |
+| 6 | Troll | Midgard |
+| 7 | Dwarf | Midgard |
+| 8 | Kobold | Midgard |
+| 14 | Valkyn | Midgard |
+| 17 | Frostalf | Midgard |
+| 20 | Minotaur (Deifrang) | Midgard |
+| 9 | Celt | Hibernia |
+| 10 | Firbolg | Hibernia |
+| 11 | Elf | Hibernia |
+| 12 | Lurikeen | Hibernia |
+| 15 | Sylvan | Hibernia |
+| 18 | Shar | Hibernia |
+| 21 | Minotaur (Graoch) | Hibernia |

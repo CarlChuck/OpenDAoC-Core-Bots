@@ -51,7 +51,7 @@ namespace DOL.GS.Scripts
 
             double speed = living.BuffBonusMultCategory1.Get((int)property);
 
-            if (living is IGamePlayer player)
+            if (living is GamePlayer or IGamePlayer)
             {
                 // Since Dark Age of Camelot's launch, we have heard continuous feedback from our community about the movement speed in our game. The concerns over how slow
                 // our movement is has continued to grow as we have added more and more areas in which to travel. Because we believe these concerns are valid, we have decided
@@ -63,44 +63,57 @@ namespace DOL.GS.Scripts
                 // - The new run speed will not stack with any other run speed spell or ability, except for Sprint.
                 // - Pets that are not in combat have also received the new run speed, only when they are following, to allow them to keep up with their owners.
 
-                double horseSpeed = player.IsOnHorse && player.ActiveHorse != null ? player.ActiveHorse.Speed * 0.01 : 1.0;
+                GamePlayer gp = living as GamePlayer;
+                IGamePlayer igp = living as IGamePlayer;
+
+                bool isOnHorse = gp?.IsOnHorse ?? igp?.IsOnHorse ?? false;
+                var activeHorse = gp?.ActiveHorse ?? igp?.ActiveHorse;
+                double horseSpeed = isOnHorse && activeHorse != null ? activeHorse.Speed * 0.01 : 1.0;
 
                 if (speed > horseSpeed)
                     horseSpeed = 1.0;
 
                 if (ServerProperties.Properties.ENABLE_PVE_SPEED)
                 {
+                    bool isStealthed = gp?.IsStealthed ?? igp?.IsStealthed ?? false;
                     // OF zones technically aren't in a RvR region.
-                    if (speed == 1 && !player.InCombat && !player.IsStealthed && !player.CurrentRegion.IsRvR && !player.CurrentZone.IsRvR)
+                    if (speed == 1 && !living.InCombat && !isStealthed && !living.CurrentRegion.IsRvR && !living.CurrentZone.IsRvR)
                         speed *= 1.25; // New run speed is 125% when no buff.
                 }
 
-                if (player.IsOverencumbered && player.Client.Account.PrivLevel == 1 && ServerProperties.Properties.ENABLE_ENCUMBERANCE_SPEED_LOSS)
+                bool isOverencumbered = gp?.IsOverencumbered ?? igp?.IsOverencumbered ?? false;
+                var client = gp?.Client ?? igp?.Client;
+                if (isOverencumbered && client?.Account.PrivLevel == 1 && ServerProperties.Properties.ENABLE_ENCUMBERANCE_SPEED_LOSS)
                 {
-                    double Enc = player.Encumberance; // Calculating player.Encumberance is a bit slow with all those locks, don't call it much.
+                    int enc = gp?.Encumberance ?? igp?.Encumberance ?? 0;
+                    int maxEnc = gp?.MaxEncumberance ?? igp?.MaxEncumberance ?? 0;
 
-                    if (Enc > player.MaxEncumberance)
+                    if (enc > maxEnc)
                     {
-                        speed *= (((player.MaxSpeedBase * 1.0 / GamePlayer.PLAYER_BASE_SPEED) * (-Enc)) / (player.MaxEncumberance * 0.35f)) + (player.MaxSpeedBase / GamePlayer.PLAYER_BASE_SPEED) + ((player.MaxSpeedBase / GamePlayer.PLAYER_BASE_SPEED) * player.MaxEncumberance / (player.MaxEncumberance * 0.35));
+                        speed *= (((living.MaxSpeedBase * 1.0 / GamePlayer.PLAYER_BASE_SPEED) * (-enc)) / (maxEnc * 0.35f)) + (living.MaxSpeedBase / GamePlayer.PLAYER_BASE_SPEED) + ((living.MaxSpeedBase / GamePlayer.PLAYER_BASE_SPEED) * maxEnc / (maxEnc * 0.35));
 
                         if (speed <= 0)
                             speed = 0;
                     }
                     else
-                        player.IsOverencumbered = false;
+                    {
+                        if (gp != null) gp.IsOverencumbered = false;
+                        else if (igp != null) igp.IsOverencumbered = false;
+                    }
                 }
 
-                if (player.IsStealthed && player.Client.Account.PrivLevel == 1)
+                bool isStealthedForSpeed = gp?.IsStealthed ?? igp?.IsStealthed ?? false;
+                if (isStealthedForSpeed && client?.Account.PrivLevel == 1)
                 {
-                    AtlasOF_MasteryOfStealth mos = player.GetAbility<AtlasOF_MasteryOfStealth>();
-                    //GameSpellEffect bloodrage = SpellHandler.FindEffectOnTarget(player, "BloodRage");
-                    //VanishEffect vanish = player.EffectList.GetOfType<VanishEffect>();
-                    double stealthSpec = player.GetModifiedSpecLevel(Specs.Stealth);
+                    AtlasOF_MasteryOfStealth mos = living.GetAbility<AtlasOF_MasteryOfStealth>();
+                    //GameSpellEffect bloodrage = SpellHandler.FindEffectOnTarget(living, "BloodRage");
+                    //VanishEffect vanish = living.EffectList.GetOfType<VanishEffect>();
+                    double stealthSpec = living.GetModifiedSpecLevel(Specs.Stealth);
 
-                    if (stealthSpec > player.Level)
-                        stealthSpec = player.Level;
+                    if (stealthSpec > living.Level)
+                        stealthSpec = living.Level;
 
-                    speed *= 0.3 + (stealthSpec + 10) * 0.3 / (player.Level + 10);
+                    speed *= 0.3 + (stealthSpec + 10) * 0.3 / (living.Level + 10);
 
                     //if (vanish != null)
                     //    speed *= vanish.SpeedBonus;
@@ -111,11 +124,11 @@ namespace DOL.GS.Scripts
                     //if (bloodrage != null)
                     //    speed *= 1 + (bloodrage.Spell.Value * 0.01); // 25 * 0.01 = 0.25 (a.k 25%) value should be 25.5
 
-                    if (player.EffectListComponent.ContainsEffectForEffectType(eEffect.ShadowRun))
+                    if (living.effectListComponent.ContainsEffectForEffectType(eEffect.ShadowRun))
                         speed *= 2;
                 }
 
-                if (player is GamePlayer && GameRelic.IsPlayerCarryingRelic((GamePlayer)player))
+                if (living is GamePlayer gamePlayer && GameRelic.IsPlayerCarryingRelic(gamePlayer))
                 {
                     if (speed > 1.0)
                         speed = 1.0;
@@ -123,10 +136,11 @@ namespace DOL.GS.Scripts
                     horseSpeed = 1.0;
                 }
 
-                if (player.IsSprinting)
+                bool isSprinting = gp?.IsSprinting ?? igp?.IsSprinting ?? false;
+                if (isSprinting)
                     speed *= 1.3;
 
-                speed *= horseSpeed;          
+                speed *= horseSpeed;
             }
             else if (living is GameNPC npc)
             {
@@ -155,12 +169,14 @@ namespace DOL.GS.Scripts
                             if (ownerSpeedAdjust > 1.0)
                                 speed *= ownerSpeedAdjust;
 
-                            if (owner is IGamePlayer playerOwner)
+                            if (owner is GamePlayer or IGamePlayer)
                             {
-                                if (playerOwner.IsOnHorse)
+                                bool ownerIsOnHorse = (owner as GamePlayer)?.IsOnHorse ?? (owner as IGamePlayer)?.IsOnHorse ?? false;
+                                if (ownerIsOnHorse)
                                     speed *= 3.0;
 
-                                if (playerOwner.IsSprinting)
+                                bool ownerIsSprinting = (owner as GamePlayer)?.IsSprinting ?? (owner as IGamePlayer)?.IsSprinting ?? false;
+                                if (ownerIsSprinting)
                                     speed *= 1.4;
                             }
                         }
@@ -177,7 +193,7 @@ namespace DOL.GS.Scripts
                         else if (owner is MimicNPC)
                             owner = brain.GetLivingOwner();
 
-                        if (owner is IGamePlayer playerOwner && playerOwner.IsSprinting)
+                        if (owner is GamePlayer or IGamePlayer && ((owner as GamePlayer)?.IsSprinting == true || (owner as IGamePlayer)?.IsSprinting == true))
                             speed *= 1.3;
                     }
                 }

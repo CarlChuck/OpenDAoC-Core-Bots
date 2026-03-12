@@ -109,31 +109,35 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
         }
 
         var bot = BotManager.CreateBot(client.Player, name, classId, raceId, genderId);
-        if (bot != null)
-        {
-            bot.SaveToDatabase();
-            BotManager.SpawnBot(bot);
-
-            // Auto-invite to group
-            if (client.Player.Group == null)
-            {
-                var group = new Group(client.Player);
-                GroupMgr.AddGroup(group);
-                group.AddMember(client.Player);
-            }
-            client.Player.Group.AddMember(bot);
-
-            // Auto-follow
-            bot.Follow(client.Player, BotManager.FOLLOW_DISTANCE, BotManager.MAX_FOLLOW_DISTANCE);
-            if (bot.Brain is DOL.AI.Brain.BotBrain brain)
-                brain.FSM.SetCurrentState(eFSMStateType.FOLLOW);
-
-            client.Out.SendMessage($"Bot '{bot.Name}' created, spawned, and following you!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
-        }
-        else
+        if (bot == null)
         {
             client.Out.SendMessage("Failed to create bot. Check class/race/gender IDs or bot limit.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+            return;
         }
+
+        bot.SaveToDatabase();
+
+        if (!BotManager.SpawnBot(bot))
+        {
+            client.Out.SendMessage("Failed to spawn bot into the world.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+            return;
+        }
+
+        // Auto-invite to group
+        if (client.Player.Group == null)
+        {
+            var group = new Group(client.Player);
+            GroupMgr.AddGroup(group);
+            group.AddMember(client.Player);
+        }
+        client.Player.Group.AddMember(bot);
+
+        // Auto-follow
+        bot.Follow(client.Player, BotManager.FOLLOW_DISTANCE, BotManager.MAX_FOLLOW_DISTANCE);
+        if (bot.Brain is DOL.AI.Brain.BotBrain brain)
+            brain.FSM.SetCurrentState(eFSMStateType.FOLLOW);
+
+        client.Out.SendMessage($"Bot '{bot.Name}' created, spawned, and following you!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
     }
 
     private void HandleSpawn(GameClient client, string[] args)
@@ -152,7 +156,11 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
             return;
         }
 
-        BotManager.SpawnBot(bot);
+        if (!BotManager.SpawnBot(bot))
+        {
+            client.Out.SendMessage("Failed to spawn bot into the world.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+            return;
+        }
 
         // Auto-invite to group
         if (client.Player.Group == null)

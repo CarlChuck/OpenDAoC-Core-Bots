@@ -50,11 +50,8 @@ namespace DOL.GS
                 return null;
             }
 
-            var bot = new GameBot(owner, classId, name);
+            var bot = new GameBot(owner, classId, name, raceId, genderId);
             ActiveBots[bot.InternalID] = bot;
-
-            bot.RaceId = raceId;
-            bot.GenderId = genderId;
             
             log.InfoFormat("Bot {0} created for player {1}", bot.InternalID, owner.Name);
             return bot;
@@ -146,15 +143,27 @@ namespace DOL.GS
         /// <summary>
         /// Spawn a bot into the world
         /// </summary>
-        public static void SpawnBot(GameBot bot)
+        public static bool SpawnBot(GameBot bot)
         {
-            if (bot != null)
+            if (bot == null) return false;
+
+            // Copy owner's position so AddToWorld has a valid region
+            bot.X = bot.Owner.X;
+            bot.Y = bot.Owner.Y;
+            bot.Z = bot.Owner.Z;
+            bot.Heading = bot.Owner.Heading;
+            bot.CurrentRegionID = bot.Owner.CurrentRegionID;
+
+            if (!bot.AddToWorld())
             {
-                bot.AddToWorld();
-                ActiveBots[bot.InternalID] = bot;
-                BotDatabase.SetBotActive(bot.DatabaseID, true);
-                log.InfoFormat("Bot {0} spawned", bot.InternalID);
+                log.ErrorFormat("Failed to spawn bot {0} — AddToWorld returned false", bot.InternalID);
+                return false;
             }
+
+            ActiveBots[bot.InternalID] = bot;
+            BotDatabase.SetBotActive(bot.DatabaseID, true);
+            log.InfoFormat("Bot {0} spawned", bot.InternalID);
+            return true;
         }
 
         /// <summary>
@@ -172,7 +181,7 @@ namespace DOL.GS
                     var bot = BotDatabase.LoadBot(owner, profile.BotId);
                     if (bot == null) continue;
 
-                    SpawnBot(bot);
+                    if (!SpawnBot(bot)) continue;
 
                     // Auto-invite to owner's group
                     if (owner.Group == null)

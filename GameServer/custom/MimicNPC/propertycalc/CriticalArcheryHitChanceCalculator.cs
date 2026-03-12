@@ -20,17 +20,17 @@ namespace DOL.GS.Scripts
         {
             int chance = living.BuffBonusCategory4[(int)property] + living.AbilityBonus[(int)property];
 
-            if (living is IGamePlayer)
+            if (living is GamePlayer or IGamePlayer)
                 chance += 10;
             else if (ServerProperties.Properties.EXPAND_WILD_MINION &&
                 living is GameNPC npc &&
                 npc.Brain is IControlledBrain brain &&
-                brain.GetIPlayerOwner() is IGamePlayer playerOwner)
+                brain.Owner is GamePlayer or IGamePlayer)
             {
                 if (npc is NecromancerPet)
                     chance += 10;
 
-                if (playerOwner.GetAbility<RealmAbilities.AtlasOF_WildMinionAbility>() is RealmAbilities.AtlasOF_WildMinionAbility wildMinionAbility)
+                if (brain.Owner.GetAbility<RealmAbilities.AtlasOF_WildMinionAbility>() is RealmAbilities.AtlasOF_WildMinionAbility wildMinionAbility)
                     chance += wildMinionAbility.Amount;
             }
 

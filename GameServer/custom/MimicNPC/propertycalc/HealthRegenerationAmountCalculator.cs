@@ -46,7 +46,7 @@ namespace DOL.GS.Scripts
                 else if (npc is not NecromancerPet)
                     regen *= 5;
             }
-            else if (living is IGamePlayer)
+            else if (living is GamePlayer or IGamePlayer)
             {
                 if (living.IsSitting)
                     regen *= 1.75;

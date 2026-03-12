@@ -32,8 +32,8 @@ namespace DOL.GS.Scripts
         {
             GameLiving livingToCheck;
 
-            if (living is NecromancerPet necroPet && necroPet.Owner is IGamePlayer playerOwner)
-                livingToCheck = (GameLiving)playerOwner;
+            if (living is NecromancerPet necroPet && necroPet.Owner is GamePlayer or IGamePlayer)
+                livingToCheck = necroPet.Owner;
             else
                 livingToCheck = living;
 
@@ -56,7 +56,7 @@ namespace DOL.GS.Scripts
             percent += living.AbilityBonus[(int)property];
 
             // Relic bonus calculated before RA bonuses
-            if (living is IGamePlayer or GameSummonedPet)
+            if (living is GamePlayer or IGamePlayer or GameSummonedPet)
                 percent += (int)(100 * RelicMgr.GetRelicBonusModifier(living.Realm, eRelicType.Magic));
 
             return percent;
@@ -90,8 +90,8 @@ namespace DOL.GS.Scripts
         {
             GameLiving livingToCheck;
 
-            if (living is NecromancerPet necroPet && necroPet.Owner is IGamePlayer playerOwner)
-                livingToCheck = (GameLiving)playerOwner;
+            if (living is NecromancerPet necroPet && necroPet.Owner is GamePlayer or IGamePlayer)
+                livingToCheck = necroPet.Owner;
             else
                 livingToCheck = living;
 

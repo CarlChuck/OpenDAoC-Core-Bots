@@ -120,7 +120,7 @@ namespace DOL.GS.Scripts
             int baseBuffBonusCap;
             int specBuffBonusCap;
 
-            if (living is IGamePlayer)
+            if (living is GamePlayer or IGamePlayer)
             {
                 baseBuffBonusCap = (int)(living.Level * 1.25);
                 specBuffBonusCap = (int)(living.Level * 1.5 * 1.25);

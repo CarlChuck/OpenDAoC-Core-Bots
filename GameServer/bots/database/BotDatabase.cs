@@ -76,11 +76,9 @@ namespace DOL.GS
                     return null;
 
                 // Create GameBot from profile
-                var bot = new GameBot(owner, profile.ClassId, profile.Name)
+                var bot = new GameBot(owner, profile.ClassId, profile.Name, profile.RaceId, profile.GenderId)
                 {
                     DatabaseID = profile.BotId,
-                    RaceId = profile.RaceId,
-                    GenderId = profile.GenderId,
                     Level = profile.Level
                 };
 

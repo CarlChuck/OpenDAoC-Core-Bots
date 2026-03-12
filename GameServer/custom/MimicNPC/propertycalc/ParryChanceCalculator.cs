@@ -38,16 +38,17 @@ namespace DOL.GS.Scripts
         {
             int chance = 0;
 
-            if (living is IGamePlayer player)
+            if (living is GamePlayer or IGamePlayer)
             {
-                if (player.HasSpecialization(Specs.Parry))
-                    chance += (player.Dexterity * 2 - 100) / 4 + (player.GetModifiedSpecLevel(Specs.Parry) - 1) * (10 / 2) + 50;
+                bool hasParry = (living as GamePlayer)?.HasSpecialization(Specs.Parry) ?? (living as IGamePlayer)?.HasSpecialization(Specs.Parry) ?? false;
+                if (hasParry)
+                    chance += (living.GetModified(eProperty.Dexterity) * 2 - 100) / 4 + (living.GetModifiedSpecLevel(Specs.Parry) - 1) * (10 / 2) + 50;
 
-                chance += player.BaseBuffBonusCategory[(int)property] * 10;
-                chance += player.SpecBuffBonusCategory[(int)property] * 10;
-                chance -= player.DebuffCategory[(int)property] * 10;
-                chance += player.BuffBonusCategory4[(int)property] * 10;
-                chance += player.AbilityBonus[(int)property] * 10;
+                chance += living.BaseBuffBonusCategory[(int)property] * 10;
+                chance += living.SpecBuffBonusCategory[(int)property] * 10;
+                chance -= living.DebuffCategory[(int)property] * 10;
+                chance += living.BuffBonusCategory4[(int)property] * 10;
+                chance += living.AbilityBonus[(int)property] * 10;
             }
             else if (living is GameNPC npc)
             {

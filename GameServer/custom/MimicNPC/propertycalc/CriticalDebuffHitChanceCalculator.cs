@@ -23,8 +23,8 @@ namespace DOL.GS.Scripts
         {
             int chance = living.AbilityBonus[(int) property];
 
-            if (living is NecromancerPet necroPet && necroPet.Brain is IControlledBrain necroBrain && necroBrain.GetIPlayerOwner() is IGamePlayer playerOwner)
-                chance += playerOwner.GetAbility<RealmAbilities.AtlasOF_WildArcanaAbility>()?.Amount ?? 0;
+            if (living is NecromancerPet necroPet && necroPet.Brain is IControlledBrain necroBrain && necroBrain.Owner is GamePlayer or IGamePlayer)
+                chance += necroBrain.Owner.GetAbility<RealmAbilities.AtlasOF_WildArcanaAbility>()?.Amount ?? 0;
 
             return Math.Min(chance, 50);
         }

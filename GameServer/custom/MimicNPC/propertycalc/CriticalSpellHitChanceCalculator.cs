@@ -23,9 +23,10 @@ namespace DOL.GS.Scripts
         {
             int chance = living.AbilityBonus[(int)property];
 
-            if (living is IGamePlayer player)
+            if (living is GamePlayer or IGamePlayer)
             {
-                if (player.CharacterClass.ClassType is eClassType.ListCaster)
+                var characterClass = (living as GamePlayer)?.CharacterClass ?? (living as IGamePlayer)?.CharacterClass;
+                if (characterClass?.ClassType is eClassType.ListCaster)
                     chance += 10;
             }
             else if (living is NecromancerPet necroPet)
@@ -37,8 +38,8 @@ namespace DOL.GS.Scripts
             // Summoned or Charmed pet.
             else if (living is GameNPC npc && ServerProperties.Properties.EXPAND_WILD_MINION)
             {
-                if (npc.Brain is IControlledBrain petBrain && petBrain.GetIPlayerOwner() is IGamePlayer playerOwner)
-                    chance += playerOwner.GetAbility<RealmAbilities.AtlasOF_WildMinionAbility>()?.Amount ?? 0;
+                if (npc.Brain is IControlledBrain petBrain && petBrain.Owner is GamePlayer or IGamePlayer)
+                    chance += petBrain.Owner.GetAbility<RealmAbilities.AtlasOF_WildMinionAbility>()?.Amount ?? 0;
             }
 
             return Math.Min(chance, 50);

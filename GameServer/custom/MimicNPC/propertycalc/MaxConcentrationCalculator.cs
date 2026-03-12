@@ -41,30 +41,31 @@ namespace DOL.GS.Scripts
 
         public override int CalcValue(GameLiving living, eProperty property)
         {
-            if (living is IGamePlayer)
+            if (living is GamePlayer or IGamePlayer)
             {
-                IGamePlayer player = living as IGamePlayer;
-                if (player.CharacterClass.ManaStat == eStat.UNDEFINED)
+                var characterClass = (living as GamePlayer)?.CharacterClass ?? (living as IGamePlayer)?.CharacterClass;
+                if (characterClass.ManaStat == eStat.UNDEFINED)
                     return 1000000;
 
-                int concBase = (int)((player.Level * 4) * 2.2);
-                int stat = player.GetModified((eProperty)player.CharacterClass.ManaStat);
+                int concBase = (int)((living.Level * 4) * 2.2);
+                int stat = living.GetModified((eProperty)characterClass.ManaStat);
                 var statConc = (stat - 50) * 2.8;
                 //int factor = (stat > 50) ? (stat - 50) / 2 : (stat - 50);
                 //int conc = (concBase + concBase * factor / 100) / 2;
                 int conc = (concBase + (int)statConc) / 2;
                 //Console.WriteLine($"New conc val {conc} oldConc {(concBase + concBase * ((stat - 50) / 2) / 100) / 2}");
-                conc = (int)(player.Effectiveness * (double)conc);
+                conc = (int)(living.Effectiveness * (double)conc);
 
                 if (conc < 0)
                 {
                     if (log.IsWarnEnabled)
-                        log.WarnFormat(living.Name + ": concentration is less than zerro (conc:{0} eff:{1:R} concBase:{2} stat:{3}})", conc, player.Effectiveness, concBase, stat);
+                        log.WarnFormat(living.Name + ": concentration is less than zerro (conc:{0} eff:{1:R} concBase:{2} stat:{3}})", conc, living.Effectiveness, concBase, stat);
                     conc = 0;
                 }
 
-                if (player.GetSpellLine("Perfecter") != null
-                   && player.MLLevel >= 4)
+                var getSpellLine = (living as GamePlayer)?.GetSpellLine("Perfecter") ?? (living as IGamePlayer)?.GetSpellLine("Perfecter");
+                int mlLevel = (living as GamePlayer)?.MLLevel ?? (living as IGamePlayer)?.MLLevel ?? 0;
+                if (getSpellLine != null && mlLevel >= 4)
                     conc += (20 * conc / 100);
 
                 return conc;

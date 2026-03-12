@@ -39,31 +39,30 @@ namespace DOL.GS.Scripts
         public override int CalcValue(GameLiving living, eProperty property)
         {
             // DOLConsole.WriteSystem("calc skill prop "+property+":");
-            if (living is IGamePlayer)
+            if (living is GamePlayer or IGamePlayer)
             {
-                IGamePlayer player = (IGamePlayer)living;
+                int itemCap = living.Level / 5 + 1;
 
-                int itemCap = player.Level / 5 + 1;
-
-                int itemBonus = player.ItemBonus[(int)property];
+                int itemBonus = living.ItemBonus[(int)property];
 
                 if (SkillBase.CheckPropertyType(property, ePropertyType.SkillMeleeWeapon))
-                    itemBonus += player.ItemBonus[(int)eProperty.AllMeleeWeaponSkills];
+                    itemBonus += living.ItemBonus[(int)eProperty.AllMeleeWeaponSkills];
                 if (SkillBase.CheckPropertyType(property, ePropertyType.SkillMagical))
-                    itemBonus += player.ItemBonus[(int)eProperty.AllMagicSkills];
+                    itemBonus += living.ItemBonus[(int)eProperty.AllMagicSkills];
                 if (SkillBase.CheckPropertyType(property, ePropertyType.SkillDualWield))
-                    itemBonus += player.ItemBonus[(int)eProperty.AllDualWieldingSkills];
+                    itemBonus += living.ItemBonus[(int)eProperty.AllDualWieldingSkills];
                 if (SkillBase.CheckPropertyType(property, ePropertyType.SkillArchery))
-                    itemBonus += player.ItemBonus[(int)eProperty.AllArcherySkills];
+                    itemBonus += living.ItemBonus[(int)eProperty.AllArcherySkills];
 
-                itemBonus += player.ItemBonus[(int)eProperty.AllSkills];
+                itemBonus += living.ItemBonus[(int)eProperty.AllSkills];
 
                 if (itemBonus > itemCap)
                     itemBonus = itemCap;
-                int buffs = player.BaseBuffBonusCategory[(int)property]; // one buff category just in case..
+                int buffs = living.BaseBuffBonusCategory[(int)property]; // one buff category just in case..
 
-                //log.Info("PLAYER item bonus="+itemBonus+"; buffs=" +buffs+"; realm=" + player.RealmLevel/10);
-                return itemBonus + buffs + player.RealmLevel / 10;
+                int realmLevel = (living as GamePlayer)?.RealmLevel ?? (living as IGamePlayer)?.RealmLevel ?? 0;
+                //log.Info("PLAYER item bonus="+itemBonus+"; buffs=" +buffs+"; realm=" + realmLevel/10);
+                return itemBonus + buffs + realmLevel / 10;
             }
             else
             {

@@ -37,10 +37,10 @@ namespace DOL.GS.Scripts
         {
             int chance = 0;
 
-            if (living is IGamePlayer player)
+            if (living is GamePlayer or IGamePlayer)
             {
-                chance += (player.Dexterity * 2 - 100) / 4 + (player.GetModifiedSpecLevel(Specs.Shields) - 1) * (10 / 2) + 50;
-                chance += player.AbilityBonus[(int)property] * 10;
+                chance += (living.GetModified(eProperty.Dexterity) * 2 - 100) / 4 + (living.GetModifiedSpecLevel(Specs.Shields) - 1) * (10 / 2) + 50;
+                chance += living.AbilityBonus[(int)property] * 10;
             }
             else if (living is GameNPC npc)
                 chance += npc.BlockChance * 10;
