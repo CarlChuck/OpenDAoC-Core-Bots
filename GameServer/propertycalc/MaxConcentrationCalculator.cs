@@ -16,21 +16,21 @@ namespace DOL.GS.PropertyCalc
 
         public override int CalcValue(GameLiving living, eProperty property) 
         {
-            if (living is GamePlayer player)
+            if (living is IGamePlayer igp)
             {
-                if (player.CharacterClass.ManaStat is eStat.UNDEFINED)
+                if (igp.CharacterClass.ManaStat is eStat.UNDEFINED)
                     return 1000000;
 
-                int concBase = (int) (player.Level * 4 * 2.2);
-                int stat = player.GetModified((eProperty) player.CharacterClass.ManaStat);
+                int concBase = (int) (igp.Level * 4 * 2.2);
+                int stat = living.GetModified((eProperty) igp.CharacterClass.ManaStat);
                 var statConc = (stat - 50) * 2.8;
                 int conc = (concBase + (int) statConc) / 2;
-                conc = (int) (player.Effectiveness * conc);
+                conc = (int) (igp.Effectiveness * conc);
 
                 if (conc < 0)
                     conc = 0;
 
-                if (player.GetSpellLine("Perfecter") != null && player.MLLevel >= 4)
+                if (igp.GetSpellLine("Perfecter") != null && igp.MLLevel >= 4)
                     conc += 20 * conc / 100;
 
                 return conc;

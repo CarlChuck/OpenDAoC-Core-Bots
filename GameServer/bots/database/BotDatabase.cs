@@ -5,6 +5,7 @@ using System.Reflection;
 using log4net;
 using DOL.Database;
 using DOL.GS.Database;
+using DOL.Database.Attributes;
 
 namespace DOL.GS
 {
@@ -75,10 +76,9 @@ namespace DOL.GS
                     return null;
 
                 // Create GameBot from profile
-                var bot = new GameBot(owner, GetClassNameById(profile.ClassId), profile.Name)
+                var bot = new GameBot(owner, profile.ClassId, profile.Name)
                 {
                     DatabaseID = profile.BotId,
-                    ClassId = profile.ClassId,
                     RaceId = profile.RaceId,
                     GenderId = profile.GenderId,
                     Level = profile.Level
@@ -107,9 +107,7 @@ namespace DOL.GS
             try
             {
                 var profiles = GameServer.Database.SelectObjects<BotProfile>(
-                    "OwnerCharacterID = @OwnerID AND Name = @Name",
-                    new QueryParameter("@OwnerID", owner.ObjectId),
-                    new QueryParameter("@Name", botName));
+                    DB.Column("OwnerCharacterID").IsEqualTo(owner.ObjectId).And(DB.Column("Name").IsEqualTo(botName)));
 
                 var profile = profiles.FirstOrDefault();
                 if (profile == null) return null;
@@ -133,8 +131,7 @@ namespace DOL.GS
             try
             {
                 return GameServer.Database.SelectObjects<BotProfile>(
-                    "OwnerCharacterID = @OwnerID",
-                    new QueryParameter("@OwnerID", owner.ObjectId)).ToList();
+                    DB.Column("OwnerCharacterID").IsEqualTo(owner.ObjectId)).ToList();
             }
             catch (Exception ex)
             {
@@ -172,6 +169,48 @@ namespace DOL.GS
             {
                 log.Error($"Error deleting bot {bot.Name}: {ex.Message}", ex);
                 return false;
+            }
+        }
+
+        /// <summary>
+        /// Set a bot's active flag in database
+        /// </summary>
+        public static void SetBotActive(long botId, bool active)
+        {
+            if (botId == 0) return;
+
+            try
+            {
+                var profile = GameServer.Database.FindObjectByKey<BotProfile>(botId);
+                if (profile != null)
+                {
+                    profile.IsActive = active;
+                    GameServer.Database.SaveObject(profile);
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Error($"Error setting bot {botId} active={active}: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
+        /// Load all active bots for an owner from database
+        /// </summary>
+        public static List<BotProfile> GetActiveBots(GamePlayer owner)
+        {
+            if (owner == null) return new List<BotProfile>();
+
+            try
+            {
+                return GameServer.Database.SelectObjects<BotProfile>(
+                    DB.Column("OwnerCharacterID").IsEqualTo(owner.ObjectId)
+                    .And(DB.Column("IsActive").IsEqualTo(1))).ToList();
+            }
+            catch (Exception ex)
+            {
+                log.Error($"Error getting active bots for {owner.Name}: {ex.Message}", ex);
+                return new List<BotProfile>();
             }
         }
 
@@ -219,18 +258,6 @@ namespace DOL.GS
             {
                 log.Error($"Error loading bot settings for {bot.Name}: {ex.Message}", ex);
             }
-        }
-
-        private static string GetClassNameById(byte classId)
-        {
-            return classId switch
-            {
-                1 => "Fighter",
-                2 => "Cleric",
-                3 => "Wizard",
-                4 => "Scout",
-                _ => "Fighter"
-            };
         }
     }
 }

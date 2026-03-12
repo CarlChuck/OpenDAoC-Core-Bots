@@ -4,14 +4,33 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using log4net;
+using DOL.Events;
+using DOL.GS.PacketHandler;
 
 namespace DOL.GS
 {
     public class BotManager
     {
         private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
-        private static readonly ConcurrentDictionary<string, GameBot> ActiveBots = new(); // ← WE UPGRADE TO ConcurrentDictionary
-        // Lock no longer needed — ConcurrentDictionary is lock-free for most ops
+        private static readonly ConcurrentDictionary<string, GameBot> ActiveBots = new();
+
+        [GameServerStartedEvent]
+        public static void OnServerStart(DOLEvent e, object sender, EventArgs args)
+        {
+            GameEventMgr.AddHandler(GamePlayerEvent.GameEntered, new DOLEventHandler(OnPlayerLogin));
+        }
+
+        [GameServerStoppedEvent]
+        public static void OnServerStop(DOLEvent e, object sender, EventArgs args)
+        {
+            GameEventMgr.RemoveHandler(GamePlayerEvent.GameEntered, new DOLEventHandler(OnPlayerLogin));
+        }
+
+        private static void OnPlayerLogin(DOLEvent e, object sender, EventArgs args)
+        {
+            if (sender is GamePlayer player)
+                RespawnBotsOnLogin(player);
+        }
 
         public const int MAX_BOTS_PER_PLAYER = 15;
         public const int FOLLOW_DISTANCE = 150;
@@ -31,30 +50,60 @@ namespace DOL.GS
                 return null;
             }
 
-            // Convert classId to class name (TODO: implement proper class mapping)
-            string className = GetClassNameById(classId);
-            
-            var bot = new GameBot(owner, className, name);
+            var bot = new GameBot(owner, classId, name);
             ActiveBots[bot.InternalID] = bot;
-            
-            // Set additional properties based on parameters
+
             bot.RaceId = raceId;
             bot.GenderId = genderId;
-            bot.ClassId = classId;
             
             log.InfoFormat("Bot {0} created for player {1}", bot.InternalID, owner.Name);
             return bot;
         }
 
-        private static string GetClassNameById(byte classId)
+        public static string GetClassNameById(byte classId)
         {
-            // TODO: Implement proper class ID to name mapping
-            return classId switch
+            return ((eCharacterClass)classId) switch
             {
-                1 => "Fighter",
-                2 => "Cleric",
-                3 => "Wizard",
-                4 => "Scout",
+                eCharacterClass.Paladin => "Paladin",
+                eCharacterClass.Armsman => "Armsman",
+                eCharacterClass.Scout => "Scout",
+                eCharacterClass.Minstrel => "Minstrel",
+                eCharacterClass.Theurgist => "Theurgist",
+                eCharacterClass.Cleric => "Cleric",
+                eCharacterClass.Wizard => "Wizard",
+                eCharacterClass.Sorcerer => "Sorcerer",
+                eCharacterClass.Infiltrator => "Infiltrator",
+                eCharacterClass.Friar => "Friar",
+                eCharacterClass.Mercenary => "Mercenary",
+                eCharacterClass.Cabalist => "Cabalist",
+                eCharacterClass.Reaver => "Reaver",
+
+                eCharacterClass.Eldritch => "Eldritch",
+                eCharacterClass.Enchanter => "Enchanter",
+                eCharacterClass.Mentalist => "Mentalist",
+                eCharacterClass.Blademaster => "Blademaster",
+                eCharacterClass.Hero => "Hero",
+                eCharacterClass.Champion => "Champion",
+                eCharacterClass.Warden => "Warden",
+                eCharacterClass.Druid => "Druid",
+                eCharacterClass.Bard => "Bard",
+                eCharacterClass.Nightshade => "Nightshade",
+                eCharacterClass.Ranger => "Ranger",
+                eCharacterClass.Valewalker => "Valewalker",
+
+                eCharacterClass.Thane => "Thane",
+                eCharacterClass.Warrior => "Warrior",
+                eCharacterClass.Shadowblade => "Shadowblade",
+                eCharacterClass.Skald => "Skald",
+                eCharacterClass.Hunter => "Hunter",
+                eCharacterClass.Healer => "Healer",
+                eCharacterClass.Spiritmaster => "Spiritmaster",
+                eCharacterClass.Shaman => "Shaman",
+                eCharacterClass.Runemaster => "Runemaster",
+                eCharacterClass.Bonedancer => "Bonedancer",
+                eCharacterClass.Berserker => "Berserker",
+                eCharacterClass.Savage => "Savage",
+
                 _ => "Fighter"
             };
         }
@@ -103,7 +152,48 @@ namespace DOL.GS
             {
                 bot.AddToWorld();
                 ActiveBots[bot.InternalID] = bot;
+                BotDatabase.SetBotActive(bot.DatabaseID, true);
                 log.InfoFormat("Bot {0} spawned", bot.InternalID);
+            }
+        }
+
+        /// <summary>
+        /// Respawn all active bots for a player on login
+        /// </summary>
+        public static void RespawnBotsOnLogin(GamePlayer owner)
+        {
+            if (owner == null) return;
+
+            var activeProfiles = BotDatabase.GetActiveBots(owner);
+            foreach (var profile in activeProfiles)
+            {
+                try
+                {
+                    var bot = BotDatabase.LoadBot(owner, profile.BotId);
+                    if (bot == null) continue;
+
+                    SpawnBot(bot);
+
+                    // Auto-invite to owner's group
+                    if (owner.Group == null)
+                    {
+                        var group = new Group(owner);
+                        GroupMgr.AddGroup(group);
+                        group.AddMember(owner);
+                    }
+                    owner.Group.AddMember(bot);
+
+                    // Auto-follow owner
+                    bot.Follow(owner, FOLLOW_DISTANCE, MAX_FOLLOW_DISTANCE);
+                    if (bot.Brain is DOL.AI.Brain.BotBrain brain)
+                        brain.FSM.SetCurrentState(eFSMStateType.FOLLOW);
+
+                    log.InfoFormat("Bot {0} respawned on login for {1}", bot.Name, owner.Name);
+                }
+                catch (Exception ex)
+                {
+                    log.Error($"Error respawning bot {profile.BotId} for {owner.Name}: {ex.Message}", ex);
+                }
             }
         }
 
@@ -138,7 +228,7 @@ namespace DOL.GS
             {
                 bot.RemoveFromWorld();
                 ActiveBots.TryRemove(bot.InternalID, out _);
-                // TODO: Set is_active=false in database
+                BotDatabase.SetBotActive(bot.DatabaseID, false);
                 log.InfoFormat("Bot {0} despawned", bot.InternalID);
             }
         }

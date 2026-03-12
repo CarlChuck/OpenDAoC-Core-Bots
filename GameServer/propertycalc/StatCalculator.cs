@@ -26,16 +26,16 @@ namespace DOL.GS.PropertyCalc
             int deathConDebuff = 0;
             GameLiving livingToCheck; // Used to get item and ability bonuses from the owner of a Necromancer pet.
 
-            if (living is GamePlayer player)
+            if (living is IGamePlayer igp)
             {
-                if (property == (eProperty) player.CharacterClass.ManaStat)
+                if (property == (eProperty) igp.CharacterClass.ManaStat)
                 {
-                    if (IsClassAffectedByAcuityAbility(player.CharacterClass))
-                        abilityBonus += player.AbilityBonus[eProperty.Acuity];
+                    if (IsClassAffectedByAcuityAbility(igp.CharacterClass))
+                        abilityBonus += igp.AbilityBonus[eProperty.Acuity];
                 }
 
-                deathConDebuff = player.TotalConstitutionLostAtDeath;
-                livingToCheck = player;
+                deathConDebuff = igp.TotalConstitutionLostAtDeath;
+                livingToCheck = living;
             }
             else if (living is NecromancerPet necromancerPet)
                 livingToCheck = necromancerPet.Owner ?? living;
@@ -64,18 +64,18 @@ namespace DOL.GS.PropertyCalc
             int baseBuffBonus = living.BaseBuffBonusCategory[property];
             int specBuffBonus = living.SpecBuffBonusCategory[property];
 
-            if (living is GamePlayer player)
+            if (living is IGamePlayer igp2)
             {
-                if (property == (eProperty) player.CharacterClass.ManaStat)
+                if (property == (eProperty) igp2.CharacterClass.ManaStat)
                 {
-                    if (player.CharacterClass.ClassType == eClassType.ListCaster)
-                        specBuffBonus += player.BaseBuffBonusCategory[eProperty.Acuity];
+                    if (igp2.CharacterClass.ClassType == eClassType.ListCaster)
+                        specBuffBonus += igp2.BaseBuffBonusCategory[eProperty.Acuity];
                 }
             }
 
             // Caps and cap increases. Only players actually have a buff bonus cap, pets don't.
-            int baseBuffBonusCap = (living is GamePlayer) ? (int)(living.Level * 1.25) : short.MaxValue;
-            int specBuffBonusCap = (living is GamePlayer) ? (int)(living.Level * 1.5 * 1.25) : short.MaxValue;
+            int baseBuffBonusCap = (living is IGamePlayer) ? (int)(living.Level * 1.25) : short.MaxValue;
+            int specBuffBonusCap = (living is IGamePlayer) ? (int)(living.Level * 1.5 * 1.25) : short.MaxValue;
 
             baseBuffBonus = Math.Min(baseBuffBonus, baseBuffBonusCap);
             specBuffBonus = Math.Min(specBuffBonus, specBuffBonusCap);
@@ -90,11 +90,11 @@ namespace DOL.GS.PropertyCalc
             int itemBonus = living.ItemBonus[property];
             int itemBonusCap = GetItemBonusCap(living);
 
-            if (living is GamePlayer player)
+            if (living is IGamePlayer igp3)
             {
-                if (property == (eProperty) player.CharacterClass.ManaStat)
+                if (property == (eProperty) igp3.CharacterClass.ManaStat)
                 {
-                    if (IsClassAffectedByAcuityAbility(player.CharacterClass))
+                    if (IsClassAffectedByAcuityAbility(igp3.CharacterClass))
                         itemBonus += living.ItemBonus[eProperty.Acuity];
                 }
             }
@@ -117,11 +117,11 @@ namespace DOL.GS.PropertyCalc
             int itemBonusCapIncreaseCap = GetItemBonusCapIncreaseCap(living);
             int itemBonusCapIncrease = living.ItemBonus[eProperty.StatCapBonus_First - eProperty.Stat_First + property];
 
-            if (living is GamePlayer player)
+            if (living is IGamePlayer igp4)
             {
-                if (property == (eProperty) player.CharacterClass.ManaStat)
+                if (property == (eProperty) igp4.CharacterClass.ManaStat)
                 {
-                    if (IsClassAffectedByAcuityAbility(player.CharacterClass))
+                    if (IsClassAffectedByAcuityAbility(igp4.CharacterClass))
                         itemBonusCapIncrease += living.ItemBonus[eProperty.AcuCapBonus];
                 }
             }
@@ -138,11 +138,11 @@ namespace DOL.GS.PropertyCalc
             int mythicalItemBonusCapIncrease = living.ItemBonus[eProperty.MythicalStatCapBonus_First - eProperty.Stat_First + property];
             int itemBonusCapIncrease = GetItemBonusCapIncrease(living, property);
 
-            if (living is GamePlayer player)
+            if (living is IGamePlayer igp5)
             {
-                if (property == (eProperty) player.CharacterClass.ManaStat)
+                if (property == (eProperty) igp5.CharacterClass.ManaStat)
                 {
-                    if (IsClassAffectedByAcuityAbility(player.CharacterClass))
+                    if (IsClassAffectedByAcuityAbility(igp5.CharacterClass))
                         mythicalItemBonusCapIncrease += living.ItemBonus[eProperty.MythicalAcuCapBonus];
                 }
             }

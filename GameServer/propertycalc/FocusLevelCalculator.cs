@@ -20,15 +20,15 @@ namespace DOL.GS.PropertyCalc
 
         public override int CalcValue(GameLiving living, eProperty property)
         {
-            if (living is GamePlayer player)
+            if (living is IGamePlayer igp)
             {
-                int itemBonus = player.ItemBonus[property];
-                int focusLevel = player.BaseBuffBonusCategory[property];
+                int itemBonus = living.ItemBonus[property];
+                int focusLevel = living.BaseBuffBonusCategory[property];
 
-                if (SkillBase.CheckPropertyType(property, ePropertyType.Focus) && player.CharacterClass.IsFocusCaster)
+                if (SkillBase.CheckPropertyType(property, ePropertyType.Focus) && igp.CharacterClass.IsFocusCaster)
                 {
-                    focusLevel += player.BaseBuffBonusCategory[eProperty.AllFocusLevels];
-                    itemBonus = Math.Max(itemBonus, player.ItemBonus[eProperty.AllFocusLevels]);
+                    focusLevel += living.BaseBuffBonusCategory[eProperty.AllFocusLevels];
+                    itemBonus = Math.Max(itemBonus, living.ItemBonus[eProperty.AllFocusLevels]);
                 }
 
                 return focusLevel + Math.Min(50, itemBonus);

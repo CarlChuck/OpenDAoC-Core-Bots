@@ -300,7 +300,7 @@ namespace DOL.GS.Keeps
 			hookpoint.Object = hookPointObj;
 
 			//create the db entry
-			Database.DbKeepHookPointItem item = new Database.DbKeepHookPointItem(component.Keep.KeepID, component.ID, hookpoint.ID, GameObjectType);
+			DOL.Database.DbKeepHookPointItem item = new DOL.Database.DbKeepHookPointItem(component.Keep.KeepID, component.ID, hookpoint.ID, GameObjectType);
 			GameServer.Database.AddObject(item);
 		}
 

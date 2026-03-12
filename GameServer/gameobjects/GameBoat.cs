@@ -142,7 +142,7 @@ namespace DOL.GS
 
         public override void LoadFromDatabase(DataObject obj)
         {
-            if (obj is not Database.DbPlayerBoat)
+            if (obj is not DbPlayerBoat)
                 return;
 
             m_dbBoat = (DbPlayerBoat) obj;

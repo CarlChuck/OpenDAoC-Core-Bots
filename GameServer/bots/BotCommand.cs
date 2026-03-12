@@ -3,6 +3,7 @@ using System.Linq;
 using System.Reflection;
 using log4net;
 using DOL.GS.Commands;
+using DOL.GS.PacketHandler;
 
 namespace DOL.GS
 {
@@ -110,8 +111,24 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
         var bot = BotManager.CreateBot(client.Player, name, classId, raceId, genderId);
         if (bot != null)
         {
-            bot.SaveToDatabase(); // ← Saves to DB
-            client.Out.SendMessage($"Bot '{bot.Name}' created and saved!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+            bot.SaveToDatabase();
+            BotManager.SpawnBot(bot);
+
+            // Auto-invite to group
+            if (client.Player.Group == null)
+            {
+                var group = new Group(client.Player);
+                GroupMgr.AddGroup(group);
+                group.AddMember(client.Player);
+            }
+            client.Player.Group.AddMember(bot);
+
+            // Auto-follow
+            bot.Follow(client.Player, BotManager.FOLLOW_DISTANCE, BotManager.MAX_FOLLOW_DISTANCE);
+            if (bot.Brain is DOL.AI.Brain.BotBrain brain)
+                brain.FSM.SetCurrentState(eFSMStateType.FOLLOW);
+
+            client.Out.SendMessage($"Bot '{bot.Name}' created, spawned, and following you!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
         }
         else
         {
@@ -136,7 +153,22 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
         }
 
         BotManager.SpawnBot(bot);
-        client.Out.SendMessage($"{bot.Name} spawned. Invite to group to activate AI.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+
+        // Auto-invite to group
+        if (client.Player.Group == null)
+        {
+            var group = new Group(client.Player);
+            GroupMgr.AddGroup(group);
+            group.AddMember(client.Player);
+        }
+        client.Player.Group.AddMember(bot);
+
+        // Auto-follow
+        bot.Follow(client.Player, BotManager.FOLLOW_DISTANCE, BotManager.MAX_FOLLOW_DISTANCE);
+        if (bot.Brain is DOL.AI.Brain.BotBrain brain)
+            brain.FSM.SetCurrentState(eFSMStateType.FOLLOW);
+
+        client.Out.SendMessage($"{bot.Name} spawned, grouped, and following you.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
     }
 
     private void HandleList(GameClient client)
@@ -148,10 +180,14 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
             return;
         }
 
-        client.Out.SendMessage($"You have {bots.Count} saved bot(s):", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+        var activeBots = BotManager.GetBotsForOwner(client.Player).ToList();
+        client.Out.SendMessage($"You have {bots.Count} saved bot(s) ({activeBots.Count} active):", eChatType.CT_System, eChatLoc.CL_SystemWindow);
         foreach (var bot in bots)
         {
-            client.Out.SendMessage($"- {bot.Name} (Class: {bot.ClassId}, Race: {bot.RaceId}, Level: {bot.Level})", 
+            var className = BotManager.GetClassNameById(bot.ClassId);
+            var isActive = activeBots.Any(b => b.Name == bot.Name);
+            var status = isActive ? "[ACTIVE]" : "[SAVED]";
+            client.Out.SendMessage($"  {status} {bot.Name} - Lv{bot.Level} {className}",
                 eChatType.CT_System, eChatLoc.CL_SystemWindow);
         }
     }
@@ -182,7 +218,9 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
 
         if (client.Player.Group == null)
         {
-            client.Player.CreateGroup();
+            var group = new Group(client.Player);
+            GroupMgr.AddGroup(group);
+            group.AddMember(client.Player);
         }
 
         if (client.Player.Group.AddMember(bot))
@@ -200,8 +238,9 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
         var bot = ResolveBotTarget(client, args, 2);
         if (bot == null) return;
 
-        bot.Follow(client.Player, BotManager.FOLLOW_DISTANCE);
-        bot.IsAIEnabled = true; // Resume if was held
+        bot.Follow(client.Player, BotManager.FOLLOW_DISTANCE, BotManager.MAX_FOLLOW_DISTANCE);
+        if (bot.Brain is DOL.AI.Brain.BotBrain brain)
+            brain.FSM.SetCurrentState(eFSMStateType.FOLLOW);
         client.Out.SendMessage($"{bot.Name} is now following you.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
     }
 
@@ -210,7 +249,8 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
         var bot = ResolveBotTarget(client, args, 2);
         if (bot == null) return;
 
-        bot.StopFollowing();
+        if (bot.Brain is DOL.AI.Brain.BotBrain brain)
+            brain.FSM.SetCurrentState(eFSMStateType.IDLE);
         client.Out.SendMessage($"{bot.Name} is holding position.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
     }
 
@@ -219,7 +259,8 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
         var bot = ResolveBotTarget(client, args, 2);
         if (bot == null) return;
 
-        bot.IsAIEnabled = false;
+        if (bot.Brain is DOL.AI.Brain.BotBrain brain)
+            brain.FSM.SetCurrentState(eFSMStateType.PASSIVE);
         client.Out.SendMessage($"{bot.Name} AI suspended.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
     }
 
@@ -228,7 +269,8 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
         var bot = ResolveBotTarget(client, args, 2);
         if (bot == null) return;
 
-        bot.IsAIEnabled = true;
+        if (bot.Brain is DOL.AI.Brain.BotBrain brain)
+            brain.FSM.SetCurrentState(eFSMStateType.FOLLOW);
         client.Out.SendMessage($"{bot.Name} AI resumed.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
     }
 

@@ -123,7 +123,7 @@ namespace DOL.GS.Keeps
 			PositionMgr.LoadGuardPosition(SpawnPosition, guard);
 			guard.RefreshTemplate();
 			PatrolGuards.Add(guard);
-			Component.Keep.Guards.Add(Database.UniqueID.IdGenerator.GenerateID(), guard);
+			Component.Keep.Guards.Add(DOL.Database.UniqueID.IdGenerator.GenerateID(), guard);
 			guard.AddToWorld();
 
 			if (ServerProperties.Properties.ENABLE_DEBUG)

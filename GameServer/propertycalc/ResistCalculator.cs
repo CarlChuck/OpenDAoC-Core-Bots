@@ -106,7 +106,7 @@ namespace DOL.GS.PropertyCalc
 
             buff -= Math.Abs(debuff);
 
-            if (buff < 0 && living is GamePlayer)
+            if (buff < 0 && living is IGamePlayer)
                 buff /= 2;
 
             return buff;

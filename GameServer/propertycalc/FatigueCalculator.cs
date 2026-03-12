@@ -16,11 +16,16 @@ namespace DOL.GS.PropertyCalc
 	{
 		public override int CalcValue(GameLiving living, eProperty property)
 		{
-			if (living is GamePlayer)
+			if (living is GamePlayer player)
 			{
-				GamePlayer player = living as GamePlayer;
-
 				int endurance = player.DBMaxEndurance;
+				endurance += (int)(endurance * (Math.Min(15, living.ItemBonus[property]) * .01));
+				return endurance;
+			}
+
+			if (living is IGamePlayer)
+			{
+				int endurance = 100;
 				endurance += (int)(endurance * (Math.Min(15, living.ItemBonus[property]) * .01));
 				return endurance;
 			}

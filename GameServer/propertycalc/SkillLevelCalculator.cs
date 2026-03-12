@@ -34,31 +34,29 @@ namespace DOL.GS.PropertyCalc
 	{
 		public SkillLevelCalculator() {}
 
-		public override int CalcValue(GameLiving living, eProperty property) 
+		public override int CalcValue(GameLiving living, eProperty property)
 		{
-			if (living is GamePlayer) 
+			if (living is IGamePlayer igp)
 			{
-				GamePlayer player = (GamePlayer)living;
+				int itemCap = igp.Level / 5 + 1;
 
-				int itemCap = player.Level/5+1;
-
-				int itemBonus = player.ItemBonus[property];
+				int itemBonus = living.ItemBonus[property];
 
 				if (SkillBase.CheckPropertyType(property, ePropertyType.SkillMeleeWeapon))
-					itemBonus += player.ItemBonus[eProperty.AllMeleeWeaponSkills];
+					itemBonus += living.ItemBonus[eProperty.AllMeleeWeaponSkills];
 				if (SkillBase.CheckPropertyType(property, ePropertyType.SkillMagical))
-					itemBonus += player.ItemBonus[eProperty.AllMagicSkills];
+					itemBonus += living.ItemBonus[eProperty.AllMagicSkills];
 				if (SkillBase.CheckPropertyType(property, ePropertyType.SkillDualWield))
-					itemBonus += player.ItemBonus[eProperty.AllDualWieldingSkills];
+					itemBonus += living.ItemBonus[eProperty.AllDualWieldingSkills];
 				if (SkillBase.CheckPropertyType(property, ePropertyType.SkillArchery))
-					itemBonus += player.ItemBonus[eProperty.AllArcherySkills];
+					itemBonus += living.ItemBonus[eProperty.AllArcherySkills];
 
-				itemBonus += player.ItemBonus[eProperty.AllSkills];
+				itemBonus += living.ItemBonus[eProperty.AllSkills];
 
 				if (itemBonus > itemCap)
 					itemBonus = itemCap;
-				int buffs = player.BaseBuffBonusCategory[property]; // one buff category just in case..
-				return itemBonus + buffs + player.RealmLevel/10;
+				int buffs = living.BaseBuffBonusCategory[property];
+				return itemBonus + buffs + igp.RealmLevel / 10;
 			}
 
 			return 0;
