@@ -71,7 +71,12 @@
       "Bash(cd \"F:\\\\_DaoC\\\\OpenDaoCBots-Git\\\\OpenDAoC-Core-Bots\" && dotnet build \"Dawn of Light.sln\" 2>&1 | grep -E \"\\(Error|Build succeeded\\)\")",
       "Bash(grep -l \"AttackAction\\\\|Combat\" \"F:/_DaoC/OpenDaoCBots-Git/OpenDAoC-Core-Bots/GameServer/bots\"/*.cs 2>/dev/null)",
       "Bash(find \"/f/_DaoC/OpenDaoCBots-Git/OpenDAoC-Core-Bots/GameServer/packets/Server/\" -name \"PacketLib*.cs\" | xargs grep -l \"SendGroupWindowUpdate\" | sort)",
-      "Bash(cd \"F:/_DaoC/OpenDaoCBots-Git/OpenDAoC-Core-Bots\" && dotnet build \"Dawn of Light.sln\" 2>&1 | tail -20)"
+      "Bash(cd \"F:/_DaoC/OpenDaoCBots-Git/OpenDAoC-Core-Bots\" && dotnet build \"Dawn of Light.sln\" 2>&1 | tail -20)",
+      "Bash(grep -n \"public.*ActiveWeapon\" GameServer/gameobjects/GameLiving.cs 2>/dev/null | head -5)",
+      "Bash(grep -n \"public.*ActiveWeaponSlot\" GameServer/gameobjects/GameLiving.cs 2>/dev/null | head -5)",
+      "Bash(grep -n \"public virtual IGameInventory\" GameServer/gameobjects/*.cs 2>/dev/null)",
+      "Bash(grep -n \"public.*Group.*{\" GameServer/gameobjects/*.cs 2>/dev/null | grep -i \"GameLiving\\\\|GamePlayer\")",
+      "Bash(grep -n \"public.*AttackComponent\\\\|public.*RangeAttackComponent\\\\|public.*StyleComponent\\\\|public.*EffectListComponent\" GameServer/gameobjects/*.cs | grep -v \"field\\\\|private\\\\|override void\" | head -20)"
     ]
   }
 }

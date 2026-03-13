@@ -405,7 +405,7 @@ namespace DOL.GS.PacketHandler
 					{
 						if (living == null) continue;
 						pak.WritePascalString(living.Name);
-						pak.WritePascalString(living is IGamePlayer igp ? igp.CharacterClass.Name : "NPC");
+						pak.WritePascalString(living is GamePlayer gp ? gp.CharacterClass.Name : living is IGamePlayer igp ? igp.CharacterClass.Name : "NPC");
 						pak.WriteShort((ushort)living.ObjectID); //or session id?
 						pak.WriteByte(living.Level);
 					}

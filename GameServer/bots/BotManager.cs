@@ -246,6 +246,7 @@ namespace DOL.GS
         {
             if (bot != null)
             {
+                bot.Group?.RemoveMember(bot);
                 bot.RemoveFromWorld();
                 ActiveBots.TryRemove(bot.InternalID, out _);
                 BotDatabase.SetBotActive(bot.DatabaseID, false);
