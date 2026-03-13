@@ -5165,6 +5165,13 @@ namespace DOL.GS
             if (ControlledBrain != null && ControlledBrain is ControlledMobBrain brain)
                 brain.OnOwnerAttacked(ad);
 
+            // Notify BotBrain instances for owned bots
+            foreach (GameBot bot in BotManager.GetBotsForOwner(this))
+            {
+                if (bot.Brain is BotBrain botBrain && bot.IsAlive && bot.ObjectState == GameObject.eObjectState.Active)
+                    botBrain.OnOwnerAttacked(ad);
+            }
+
             switch (ad.AttackResult)
             {
                 // is done in game living because of guard

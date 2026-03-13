@@ -447,17 +447,28 @@ namespace DOL.AI.Brain
             return false;
         }
 
-        private void OnOwnerAttacked(DOLEvent e, object sender, EventArgs args)
+        /// <summary>
+        /// Called when the bot's owner is attacked by an enemy.
+        /// Adds the attacker to the aggro list and transitions to AGGRO state.
+        /// </summary>
+        /// <param name="ad">The attack data</param>
+        public virtual void OnOwnerAttacked(AttackData ad)
         {
-            if (args is AttackedByEnemyEventArgs attackArgs && attackArgs.AttackData?.Attacker is GameLiving attacker)
+            if (ad?.Attacker is GameLiving attacker)
             {
                 // Add attacker to aggro list when owner is attacked
-                AddToAggroList(attacker, attacker.EffectiveLevel + attackArgs.AttackData.Damage + attackArgs.AttackData.CriticalDamage);
+                AddToAggroList(attacker, attacker.EffectiveLevel + ad.Damage + ad.CriticalDamage);
 
                 // Transition to AGGRO state if not already
                 if (FSM.GetCurrentState() != FSM.GetState(eFSMStateType.AGGRO))
                     FSM.SetCurrentState(eFSMStateType.AGGRO);
             }
+        }
+
+        private void OnOwnerAttacked(DOLEvent e, object sender, EventArgs args)
+        {
+            if (args is AttackedByEnemyEventArgs attackArgs)
+                OnOwnerAttacked(attackArgs.AttackData);
         }
 
         public override void Think()

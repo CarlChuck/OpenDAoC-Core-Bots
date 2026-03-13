@@ -1454,6 +1454,9 @@ namespace DOL.GS
 		/// <param name="ad">information about the attack</param>
 		public virtual void OnAttackedByEnemy(AttackData ad)
 		{
+			// Fire the event for registered handlers (like BotBrain)
+			GameEventMgr.Notify(GameLivingEvent.AttackedByEnemy, this, new AttackedByEnemyEventArgs(ad));
+
 			HandleControlledPetCombatMessageOnAttacked(ad);
 
 			// Note that this function is called whenever an attack is received, regardless of whether that attack was successful.
