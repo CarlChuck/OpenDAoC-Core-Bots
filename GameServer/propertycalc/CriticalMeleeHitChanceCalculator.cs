@@ -22,7 +22,7 @@ namespace DOL.GS.PropertyCalc
 
             int chance = living.OtherBonus[property] + living.AbilityBonus[property];
 
-            if (living is IGamePlayer)
+            if (living is GamePlayer)
                 chance += 10;
             else if (living is GameNPC npc &&
                 npc.Brain is IControlledBrain petBrain &&

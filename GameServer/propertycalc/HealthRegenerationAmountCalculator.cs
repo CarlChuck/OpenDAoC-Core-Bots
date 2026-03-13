@@ -39,11 +39,7 @@ namespace DOL.GS.PropertyCalc
 
             regen += living.BaseBuffBonusCategory[property] + living.AbilityBonus[property] + living.ItemBonus[property] - debuff;
 
-            if (living is IGamePlayer)
-            {
-                // Bots use base regen like players — no NPC fast-regen
-            }
-            else if (living is GameNPC npc)
+            if (living is GameNPC npc)
             {
                 // Halved regeneration amount for NPCs in combat.
                 // NPCs (necromancer pets excluded) out of combat and without anything in their aggro list (so that it doesn't trigger when NPCs are being kited) get a huge bonus.

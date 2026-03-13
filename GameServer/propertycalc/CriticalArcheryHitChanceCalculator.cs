@@ -19,7 +19,7 @@ namespace DOL.GS.PropertyCalc
         {
             int chance = living.OtherBonus[property] + living.AbilityBonus[property];
 
-            if (living is IGamePlayer)
+            if (living is GamePlayer)
                 chance += 10;
             else if (ServerProperties.Properties.EXPAND_WILD_MINION &&
                 living is GameNPC npc &&

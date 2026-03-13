@@ -32,70 +32,72 @@ namespace DOL.GS.PropertyCalc
             double speedIncrease = living.BuffBonusMultCategory1.Get((int)property);
             double maxSpeedBase = living.MaxSpeedBase;
 
-            if (living is IGamePlayer igp)
+            if (living is GamePlayer player)
             {
-                double horseSpeed = igp.IsOnHorse && igp.ActiveHorse != null ? igp.ActiveHorse.Speed * 0.01 : 1.0;
+                // Since Dark Age of Camelot's launch, we have heard continuous feedback from our community about the movement speed in our game. The concerns over how slow
+                // our movement is has continued to grow as we have added more and more areas in which to travel. Because we believe these concerns are valid, we have decided
+                // to make a long requested change to the game, enhancing the movement speed of all players who are out of combat. This new run state allows the player to move
+                // faster than normal run speed, provided that the player is not in any form of combat. Along with this change, we have slightly increased the speed of all
+                // secondary speed buffs (see below for details). Both of these changes are noticeable but will not impinge upon the supremacy of the primary speed buffs available
+                // to the Bard, Skald and Minstrel.
+                // - The new run speed does not work if the player is in any form of combat. All combat timers must also be expired.
+                // - The new run speed will not stack with any other run speed spell or ability, except for Sprint.
+                // - Pets that are not in combat have also received the new run speed, only when they are following, to allow them to keep up with their owners.
+
+                double horseSpeed = player.IsOnHorse ? player.ActiveHorse.Speed * 0.01 : 1.0;
 
                 if (speedIncrease > horseSpeed)
                     horseSpeed = 1.0;
 
                 if (ServerProperties.Properties.ENABLE_PVE_SPEED)
                 {
-                    if (speedIncrease == 1 && !igp.InCombat && !igp.IsStealthed && !living.CurrentRegion.IsRvR && !living.CurrentZone.IsRvR)
-                        speedIncrease *= 1.25;
+                    // OF zones technically aren't in a RvR region.
+                    if (speedIncrease == 1 && !player.InCombat && !player.IsStealthed && !player.CurrentRegion.IsRvR && !player.CurrentZone.IsRvR)
+                        speedIncrease *= 1.25; // New run speed is 125% when no buff.
                 }
 
-                // Encumbrance and priv level checks only apply to real players
-                if (living is GamePlayer gp)
+                if (player.IsEncumbered && player.Client.Account.PrivLevel == 1 && ServerProperties.Properties.ENABLE_ENCUMBERANCE_SPEED_LOSS)
                 {
-                    if (gp.IsEncumbered && gp.Client.Account.PrivLevel == 1 && ServerProperties.Properties.ENABLE_ENCUMBERANCE_SPEED_LOSS)
-                    {
-                        speedIncrease *= gp.MaxSpeedModifierFromEncumbrance;
+                    speedIncrease *= player.MaxSpeedModifierFromEncumbrance;
 
-                        if (speedIncrease <= 0)
-                            speedIncrease = 0;
-                    }
-
-                    if (gp.IsStealthed && gp.Client.Account.PrivLevel == 1)
-                    {
-                        AtlasOF_MasteryOfStealth mos = gp.GetAbility<AtlasOF_MasteryOfStealth>();
-                        double stealthSpec = gp.GetModifiedSpecLevel(Specs.Stealth);
-
-                        if (stealthSpec > gp.Level)
-                            stealthSpec = gp.Level;
-
-                        speedIncrease *= 0.3 + (stealthSpec + 10) * 0.3 / (gp.Level + 10);
-
-                        if (mos != null)
-                            speedIncrease *= 1 + mos.GetAmountForLevel(mos.Level) / 100.0;
-
-                        if (gp.effectListComponent.ContainsEffectForEffectType(eEffect.ShadowRun))
-                            speedIncrease *= 2;
-                    }
-
-                    if (GameRelic.IsPlayerCarryingRelic(gp))
-                    {
-                        if (speedIncrease > 1.0)
-                            speedIncrease = 1.0;
-
-                        horseSpeed = 1.0;
-                    }
+                    if (speedIncrease <= 0)
+                        speedIncrease = 0;
                 }
-                else if (igp.IsStealthed)
+
+                if (player.IsStealthed && player.Client.Account.PrivLevel == 1)
                 {
-                    // Bot stealth speed (simplified — no priv level check)
-                    double stealthSpec = living.GetModifiedSpecLevel(Specs.Stealth);
+                    AtlasOF_MasteryOfStealth mos = player.GetAbility<AtlasOF_MasteryOfStealth>();
+                    //GameSpellEffect bloodrage = SpellHandler.FindEffectOnTarget(player, "BloodRage");
+                    //VanishEffect vanish = player.EffectList.GetOfType<VanishEffect>();
+                    double stealthSpec = player.GetModifiedSpecLevel(Specs.Stealth);
 
-                    if (stealthSpec > igp.Level)
-                        stealthSpec = igp.Level;
+                    if (stealthSpec > player.Level)
+                        stealthSpec = player.Level;
 
-                    speedIncrease *= 0.3 + (stealthSpec + 10) * 0.3 / (igp.Level + 10);
+                    speedIncrease *= 0.3 + (stealthSpec + 10) * 0.3 / (player.Level + 10);
 
-                    if (living.effectListComponent.ContainsEffectForEffectType(eEffect.ShadowRun))
+                    //if (vanish != null)
+                    //    speed *= vanish.SpeedBonus;
+
+                    if (mos != null)
+                        speedIncrease *= 1 + mos.GetAmountForLevel(mos.Level) / 100.0;
+
+                    //if (bloodrage != null)
+                    //    speed *= 1 + (bloodrage.Spell.Value * 0.01); // 25 * 0.01 = 0.25 (a.k 25%) value should be 25.5
+
+                    if (player.effectListComponent.ContainsEffectForEffectType(eEffect.ShadowRun))
                         speedIncrease *= 2;
                 }
 
-                if (igp.IsSprinting)
+                if (GameRelic.IsPlayerCarryingRelic(player))
+                {
+                    if (speedIncrease > 1.0)
+                        speedIncrease = 1.0;
+
+                    horseSpeed = 1.0;
+                }
+
+                if (player.IsSprinting)
                     speedIncrease *= SPRINT;
 
                 speedIncrease *= horseSpeed;

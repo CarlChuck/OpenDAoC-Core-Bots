@@ -37,16 +37,16 @@ namespace DOL.GS.PropertyCalc
         {
             int chance = 0;
 
-            if (living is IGamePlayer igp)
+            if (living is GamePlayer player)
             {
-                if (igp.HasSpecialization(Specs.Parry))
-                    chance += (igp.Dexterity * 2 - 100) / 4 + (living.GetModifiedSpecLevel(Specs.Parry) - 1) * (10 / 2) + 50;
+                if (player.HasSpecialization(Specs.Parry))
+                    chance += (player.Dexterity * 2 - 100) / 4 + (player.GetModifiedSpecLevel(Specs.Parry) - 1) * (10 / 2) + 50;
 
-                chance += living.BaseBuffBonusCategory[property] * 10;
-                chance += living.SpecBuffBonusCategory[property] * 10;
-                chance -= living.DebuffCategory[property] * 10;
-                chance += living.OtherBonus[property] * 10;
-                chance += living.AbilityBonus[property] * 10;
+                chance += player.BaseBuffBonusCategory[property] * 10;
+                chance += player.SpecBuffBonusCategory[property] * 10;
+                chance -= player.DebuffCategory[property] * 10;
+                chance += player.OtherBonus[property] * 10;
+                chance += player.AbilityBonus[property] * 10;
             }
             else if (living is GameNPC npc)
             {

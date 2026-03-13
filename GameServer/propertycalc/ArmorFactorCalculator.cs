@@ -20,7 +20,7 @@ namespace DOL.GS.PropertyCalc
         {
             switch (living)
             {
-                case IGamePlayer:
+                case GamePlayer:
                 case GameTrainingDummy:
                     return CalculatePlayerArmorFactor(living, property);
                 case GameKeepDoor:

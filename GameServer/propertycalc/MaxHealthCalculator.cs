@@ -19,21 +19,21 @@ namespace DOL.GS.PropertyCalc
     {
         public override int CalcValue(GameLiving living, eProperty property)
         {
-            if (living is IGamePlayer igp)
+            if (living is GamePlayer player)
             {
-                int hpBase = igp.CalculateMaxHealth(igp.Level, living.GetModified(eProperty.Constitution));
-                int buffBonus = living.BaseBuffBonusCategory[property];
+                int hpBase = player.CalculateMaxHealth(player.Level, player.GetModified(eProperty.Constitution));
+                int buffBonus = player.BaseBuffBonusCategory[property];
 
                 if (buffBonus < 0)
                     buffBonus = (int) ((1 + buffBonus / -100.0) * hpBase) - hpBase;
 
-                int itemBonus = living.ItemBonus[property];
-                int cap = GetItemBonusCap(living) + GetItemBonusCapIncrease(living);
+                int itemBonus = player.ItemBonus[property];
+                int cap = GetItemBonusCap(player) + GetItemBonusCapIncrease(player);
                 itemBonus = Math.Min(itemBonus, cap);
 
-                if (igp.HasAbility(Abilities.ScarsOfBattle) && igp.Level >= 40)
+                if (player.HasAbility(Abilities.ScarsOfBattle) && player.Level >= 40)
                 {
-                    int levelBonus = Math.Min(igp.Level - 40, 10);
+                    int levelBonus = Math.Min(player.Level - 40, 10);
                     hpBase = (int) (hpBase * (100 + levelBonus) * 0.01);
                 }
 

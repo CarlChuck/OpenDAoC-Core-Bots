@@ -22,9 +22,9 @@ namespace DOL.GS.PropertyCalc
         {
             int chance = living.AbilityBonus[property];
 
-            if (living is IGamePlayer igp)
+            if (living is GamePlayer player)
             {
-                if (igp.CharacterClass.ClassType is eClassType.ListCaster)
+                if (player.CharacterClass.ClassType is eClassType.ListCaster)
                     chance += 10;
             }
             else if (living is NecromancerPet necroPet)

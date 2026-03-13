@@ -70,7 +70,7 @@ namespace DOL.GS.PropertyCalc
             int debuff = Math.Abs(living.DebuffCategory[property]) + Math.Abs(living.SpecDebuffCategory[property]);
             buff -= debuff;
 
-            if (buff < 0 && living is IGamePlayer)
+            if (buff < 0 && living is GamePlayer)
                 buff /= 2;
 
             return buff;

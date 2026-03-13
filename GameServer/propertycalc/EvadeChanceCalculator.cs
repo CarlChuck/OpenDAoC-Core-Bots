@@ -16,16 +16,16 @@ namespace DOL.GS.PropertyCalc
         {
             int chance = 0;
 
-            if (living is IGamePlayer igp)
+            if (living is GamePlayer player)
             {
-                if (igp.HasAbility(Abilities.Evade))
-                    chance += (900 + igp.Quickness + igp.Dexterity) * living.GetAbilityLevel(Abilities.Evade) * 5 / 100;
+                if (player.HasAbility(Abilities.Evade))
+                    chance += (900 + player.Quickness + player.Dexterity) * player.GetAbilityLevel(Abilities.Evade) * 5 / 100;
 
-                chance += living.BaseBuffBonusCategory[property] * 10;
-                chance += living.SpecBuffBonusCategory[property] * 10;
-                chance -= living.DebuffCategory[property] * 10;
-                chance += living.OtherBonus[property] * 10;
-                chance += living.AbilityBonus[property] * 10;
+                chance += player.BaseBuffBonusCategory[property] * 10;
+                chance += player.SpecBuffBonusCategory[property] * 10;
+                chance -= player.DebuffCategory[property] * 10;
+                chance += player.OtherBonus[property] * 10;
+                chance += player.AbilityBonus[property] * 10;
             }
             else if (living is GameNPC npc)
                 chance += npc.AbilityBonus[property] * 10 + npc.EvadeChance * 10;
