@@ -621,12 +621,12 @@ namespace DOL.AI.Brain
                 }
 
                 // Check if owner simply has a valid target (for manual attack commands)
-                if (_brain.BotBody.Owner.TargetObject is GameLiving ownerTarget
-                    && ownerTarget.IsAlive
-                    && _brain.CanAggroTarget(ownerTarget)
+                if (_brain.BotBody.Owner.TargetObject is GameLiving manualTarget
+                    && manualTarget.IsAlive
+                    && _brain.CanAggroTarget(manualTarget)
                     && !_brain.HasAggro)
                 {
-                    _brain.AddToAggroList(ownerTarget, 1);
+                    _brain.AddToAggroList(manualTarget, 1);
                     _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
                     return;
                 }
