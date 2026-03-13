@@ -416,8 +416,28 @@ namespace DOL.AI.Brain
             FSM.SetCurrentState(eFSMStateType.IDLE);
         }
 
+        public override bool Start()
+        {
+            if (!base.Start())
+                return false;
+
+            // Register for owner attack events so bot can assist when owner is attacked
+            if (BotBody?.Owner != null)
+            {
+                GameEventMgr.AddHandler(BotBody.Owner, GameLivingEvent.AttackedByEnemy, new DOLEventHandler(OnOwnerAttacked));
+            }
+
+            return true;
+        }
+
         public override bool Stop()
         {
+            // Unregister from owner attack events
+            if (BotBody?.Owner != null)
+            {
+                GameEventMgr.RemoveHandler(BotBody.Owner, GameLivingEvent.AttackedByEnemy, new DOLEventHandler(OnOwnerAttacked));
+            }
+
             if (base.Stop())
             {
                 ClearAggroList();
@@ -425,6 +445,19 @@ namespace DOL.AI.Brain
             }
 
             return false;
+        }
+
+        private void OnOwnerAttacked(DOLEvent e, object sender, EventArgs args)
+        {
+            if (args is AttackedByEnemyEventArgs attackArgs && attackArgs.AttackData?.Attacker is GameLiving attacker)
+            {
+                // Add attacker to aggro list when owner is attacked
+                AddToAggroList(attacker, attacker.EffectiveLevel + attackArgs.AttackData.Damage + attackArgs.AttackData.CriticalDamage);
+
+                // Transition to AGGRO state if not already
+                if (FSM.GetCurrentState() != FSM.GetState(eFSMStateType.AGGRO))
+                    FSM.SetCurrentState(eFSMStateType.AGGRO);
+            }
         }
 
         public override void Think()
@@ -541,14 +574,29 @@ namespace DOL.AI.Brain
                     return;
                 }
 
-                // Check if owner is attacking something
-                if (_brain.BotBody.Owner.TargetObject is GameLiving ownerTarget
-                    && (_brain.BotBody.Owner.IsAttacking || (_brain.BotBody.Owner.IsCasting && _brain.BotBody.Owner.castingComponent?.SpellHandler?.Spell?.IsHarmful == true))
-                    && _brain.CanAggroTarget(ownerTarget))
+                // Check if owner is in combat or attacking something
+                if (_brain.BotBody.Owner.InCombat || _brain.BotBody.Owner.IsAttacking)
                 {
-                    _brain.AddToAggroList(ownerTarget, 1);
-                    _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
-                    return;
+                    // Try to get owner's target
+                    if (_brain.BotBody.Owner.TargetObject is GameLiving ownerTarget
+                        && ownerTarget.IsAlive
+                        && _brain.CanAggroTarget(ownerTarget))
+                    {
+                        _brain.AddToAggroList(ownerTarget, 1);
+                        _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
+                        return;
+                    }
+
+                    // If owner is in combat but we don't have a valid target, check recent attackers
+                    if (_brain.BotBody.Owner.InCombat)
+                    {
+                        // Check if owner was recently attacked - use aggro list from event handler
+                        if (_brain.HasAggro)
+                        {
+                            _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
+                            return;
+                        }
+                    }
                 }
 
                 // Check if any group member is being attacked
