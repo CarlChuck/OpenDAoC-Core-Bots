@@ -760,6 +760,34 @@ namespace DOL.AI.Brain
                         return;
                     }
 
+                    // Switch weapon based on target distance before attacking
+                    if (Body.TargetObject is GameLiving livingTarget)
+                    {
+                        int distance = (int)Body.GetDistanceTo(livingTarget);
+
+                        if (distance <= Body.MeleeAttackRange)
+                        {
+                            // In melee range - switch to melee if currently using ranged
+                            if (Body.ActiveWeaponSlot == eActiveWeaponSlot.Distance)
+                            {
+                                // Prefer two-handed if available, otherwise standard
+                                if (BotBody.Inventory.GetItem(eInventorySlot.TwoHandWeapon) != null)
+                                    Body.SwitchWeapon(eActiveWeaponSlot.TwoHanded);
+                                else if (BotBody.Inventory.GetItem(eInventorySlot.RightHandWeapon) != null)
+                                    Body.SwitchWeapon(eActiveWeaponSlot.Standard);
+                            }
+                        }
+                        else
+                        {
+                            // Out of melee range - switch to ranged if available
+                            if (Body.ActiveWeaponSlot != eActiveWeaponSlot.Distance &&
+                                BotBody.Inventory.GetItem(eInventorySlot.DistanceWeapon) != null)
+                            {
+                                Body.SwitchWeapon(eActiveWeaponSlot.Distance);
+                            }
+                        }
+                    }
+
                     Body.StartAttack(Body.TargetObject);
                 }
             }
