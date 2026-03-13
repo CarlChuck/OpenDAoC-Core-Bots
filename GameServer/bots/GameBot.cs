@@ -110,6 +110,72 @@ namespace DOL.GS
 
         #endregion
 
+        #region IGamePlayer — Health/Mana/Endurance Overrides
+
+        public override int Health
+        {
+            get => base.Health;
+            set
+            {
+                byte oldPercent = HealthPercent;
+                base.Health = value;
+
+                if (oldPercent != HealthPercent)
+                    Group?.UpdateMember(this, false, false);
+            }
+        }
+
+        public override int Mana
+        {
+            get => m_mana;
+            set
+            {
+                byte oldPercent = ManaPercent;
+                int maxMana = MaxMana;
+                m_mana = Math.Clamp(value, 0, maxMana);
+
+                if (m_mana < maxMana)
+                    StartPowerRegeneration();
+
+                if (oldPercent != ManaPercent)
+                    Group?.UpdateMember(this, false, false);
+            }
+        }
+
+        public override int MaxMana
+        {
+            get
+            {
+                if (CharacterClass?.ManaStat is eStat manaStat && manaStat != eStat.UNDEFINED)
+                {
+                    int calculated = CalculateMaxMana(Level, GetBaseStat(manaStat));
+                    if (calculated > 0)
+                        return calculated;
+                }
+
+                return GetModified(eProperty.MaxMana);
+            }
+        }
+
+        public override int Endurance
+        {
+            get => m_endurance;
+            set
+            {
+                byte oldPercent = EndurancePercent;
+                int maxEndurance = MaxEndurance;
+                m_endurance = Math.Clamp(value, 0, maxEndurance);
+
+                if (m_endurance < maxEndurance)
+                    StartEnduranceRegeneration();
+
+                if (oldPercent != EndurancePercent)
+                    Group?.UpdateMember(this, false, false);
+            }
+        }
+
+        #endregion
+
         #region IGamePlayer — Health/Mana Calculations
 
         public virtual int CalculateMaxHealth(int level, int constitution)

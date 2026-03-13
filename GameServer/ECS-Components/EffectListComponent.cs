@@ -372,9 +372,16 @@ namespace DOL.GS
 
         public virtual void RequestPlayerUpdate(EffectHelper.PlayerUpdate playerUpdate)
         {
-            // Icon updates on pets propagate to their owner to update the pet window.
-            if ((playerUpdate & EffectHelper.PlayerUpdate.Icons) != 0 && Owner is GameNPC npc && npc.Brain is IControlledBrain brain)
-                (brain.Owner as GamePlayer)?.effectListComponent.RequestPlayerUpdate(EffectHelper.PlayerUpdate.PetWindow);
+            if ((playerUpdate & EffectHelper.PlayerUpdate.Icons) != 0)
+            {
+                // Icon updates on pets propagate to their owner to update the pet window.
+                if (Owner is GameNPC npc && npc.Brain is IControlledBrain brain)
+                    (brain.Owner as GamePlayer)?.effectListComponent.RequestPlayerUpdate(EffectHelper.PlayerUpdate.PetWindow);
+
+                // Update the group window for non-player group members (e.g. bots) so buff icons appear.
+                if (Owner is not GamePlayer && Owner.Group != null)
+                    Owner.Group.UpdateMember(Owner, true, false);
+            }
         }
 
         public void ProcessEffect(ECSGameEffect effect)

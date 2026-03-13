@@ -79,7 +79,8 @@
       "Bash(grep -n \"public.*AttackComponent\\\\|public.*RangeAttackComponent\\\\|public.*StyleComponent\\\\|public.*EffectListComponent\" GameServer/gameobjects/*.cs | grep -v \"field\\\\|private\\\\|override void\" | head -20)",
       "Bash(grep -n \"class ABrain\\\\|class.*Brain\" /f/_DaoC/OpenDaoCBots-Git/OpenDAoC-Core-Bots/GameServer/ai/brain/*.cs | grep -E \"ABrain|ControlledMobBrain|StandardMobBrain\")",
       "Bash(find F:/_DaoC/OpenDaoCBots-Git/OpenDAoC-Core-Bots/GameServer/scripts/dbupdater -name \"*.cs\" -type f 2>/dev/null | head -5)",
-      "Bash(find F:/_DaoC/OpenDaoCBots-Git/OpenDAoC-Core-Bots -name \"*.db\" -o -name \"*.sql\" 2>/dev/null | head -10)"
+      "Bash(find F:/_DaoC/OpenDaoCBots-Git/OpenDAoC-Core-Bots -name \"*.db\" -o -name \"*.sql\" 2>/dev/null | head -10)",
+      "Bash(cd \"F:\\\\_DaoC\\\\OpenDaoCBots-Git\\\\OpenDAoC-Core-Bots\" && find . -name \"*.cs\" -type f | xargs grep -l \"SendGroupMemberUpdate\\\\|SendGroupWindowUpdate\" | head -20)"
     ]
   }
 }

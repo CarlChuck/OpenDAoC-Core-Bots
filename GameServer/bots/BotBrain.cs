@@ -545,6 +545,16 @@ namespace DOL.AI.Brain
                         return;
                     }
 
+                    // Check if owner simply has a valid target (for manual attack commands)
+                    if (_brain.BotBody.Owner.TargetObject is GameLiving manualTarget
+                        && manualTarget.IsAlive
+                        && _brain.CanAggroTarget(manualTarget))
+                    {
+                        _brain.AddToAggroList(manualTarget, 1);
+                        _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
+                        return;
+                    }
+
                     if (!_brain.Body.IsWithinRadius(_brain.BotBody.Owner, BotManager.MAX_FOLLOW_DISTANCE))
                     {
                         _brain.FSM.SetCurrentState(eFSMStateType.FOLLOW);
@@ -608,6 +618,17 @@ namespace DOL.AI.Brain
                             return;
                         }
                     }
+                }
+
+                // Check if owner simply has a valid target (for manual attack commands)
+                if (_brain.BotBody.Owner.TargetObject is GameLiving ownerTarget
+                    && ownerTarget.IsAlive
+                    && _brain.CanAggroTarget(ownerTarget)
+                    && !_brain.HasAggro)
+                {
+                    _brain.AddToAggroList(ownerTarget, 1);
+                    _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
+                    return;
                 }
 
                 // Check if any group member is being attacked
