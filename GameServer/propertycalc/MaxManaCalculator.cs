@@ -19,7 +19,15 @@ namespace DOL.GS.PropertyCalc
         public override int CalcValue(GameLiving living, eProperty property)
         {
             if (living is not GamePlayer player)
+            {
+                if (living is IGamePlayer igp && igp.CharacterClass?.ManaStat is not eStat.UNDEFINED)
+                {
+                    eStat botManaStat = igp.CharacterClass.ManaStat;
+                    return igp.CalculateMaxMana(igp.Level, living.GetModified((eProperty) botManaStat));
+                }
+
                 return 0;
+            }
 
             eStat manaStat;
 

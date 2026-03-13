@@ -50,9 +50,20 @@ namespace DOL.GS
                 return null;
             }
 
-            var bot = new GameBot(owner, classId, name, raceId, genderId);
+            GameBot bot;
+
+            try
+            {
+                bot = new GameBot(owner, classId, name, raceId, genderId);
+            }
+            catch (Exception ex)
+            {
+                log.Error($"Failed to create bot for player {owner.Name} with class {classId}: {ex.Message}", ex);
+                return null;
+            }
+
             ActiveBots[bot.InternalID] = bot;
-            
+
             log.InfoFormat("Bot {0} created for player {1}", bot.InternalID, owner.Name);
             return bot;
         }

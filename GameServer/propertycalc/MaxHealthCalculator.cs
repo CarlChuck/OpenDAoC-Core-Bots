@@ -45,6 +45,17 @@ namespace DOL.GS.PropertyCalc
                 result += itemBonus + buffBonus + flatAbilityBonus;
                 return (int) result;
             }
+            else if (living is IGamePlayer igp)
+            {
+                int hpBase = igp.CalculateMaxHealth(igp.Level, living.GetModified(eProperty.Constitution));
+                int buffBonus = living.BaseBuffBonusCategory[property];
+
+                if (buffBonus < 0)
+                    buffBonus = (int) ((1 + buffBonus / -100.0) * hpBase) - hpBase;
+
+                int itemBonus = Math.Min(living.ItemBonus[property], GetItemBonusCap(living) + GetItemBonusCapIncrease(living));
+                return Math.Max(1, hpBase + buffBonus + itemBonus);
+            }
             else if (living is GameKeepComponent keepComponent)
             {
                 AbstractGameKeep gameKeep = keepComponent.Keep;

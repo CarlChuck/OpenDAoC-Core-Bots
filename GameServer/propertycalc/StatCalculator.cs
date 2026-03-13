@@ -48,6 +48,16 @@ namespace DOL.GS.PropertyCalc
                 deathConDebuff = player.TotalConstitutionLostAtDeath;
                 livingToCheck = player;
             }
+            else if (living is IGamePlayer igp)
+            {
+                if (igp.CharacterClass != null && property == (eProperty) igp.CharacterClass.ManaStat)
+                {
+                    if (IsClassAffectedByAcuityAbility(igp.CharacterClass))
+                        abilityBonus += igp.AbilityBonus[eProperty.Acuity];
+                }
+
+                livingToCheck = living;
+            }
             else if (living is NecromancerPet necromancerPet)
                 livingToCheck = necromancerPet.Owner ?? living;
             else
@@ -94,10 +104,18 @@ namespace DOL.GS.PropertyCalc
                         specBuffBonus += player.BaseBuffBonusCategory[eProperty.Acuity];
                 }
             }
+            else if (living is IGamePlayer igp)
+            {
+                if (igp.CharacterClass != null && property == (eProperty) igp.CharacterClass.ManaStat)
+                {
+                    if (igp.CharacterClass.ClassType == eClassType.ListCaster)
+                        specBuffBonus += living.BaseBuffBonusCategory[eProperty.Acuity];
+                }
+            }
 
             // Caps and cap increases. Only players actually have a buff bonus cap, pets don't.
-            int baseBuffBonusCap = (living is GamePlayer) ? (int)(living.Level * 1.25) : short.MaxValue;
-            int specBuffBonusCap = (living is GamePlayer) ? (int)(living.Level * 1.5 * 1.25) : short.MaxValue;
+            int baseBuffBonusCap = (living is GamePlayer or IGamePlayer) ? (int)(living.Level * 1.25) : short.MaxValue;
+            int specBuffBonusCap = (living is GamePlayer or IGamePlayer) ? (int)(living.Level * 1.5 * 1.25) : short.MaxValue;
 
             baseBuffBonus = Math.Min(baseBuffBonus, baseBuffBonusCap);
             specBuffBonus = Math.Min(specBuffBonus, specBuffBonusCap);
@@ -117,6 +135,14 @@ namespace DOL.GS.PropertyCalc
                 if (property == (eProperty) player.CharacterClass.ManaStat)
                 {
                     if (IsClassAffectedByAcuityAbility(player.CharacterClass))
+                        itemBonus += living.ItemBonus[eProperty.Acuity];
+                }
+            }
+            else if (living is IGamePlayer igp)
+            {
+                if (igp.CharacterClass != null && property == (eProperty) igp.CharacterClass.ManaStat)
+                {
+                    if (IsClassAffectedByAcuityAbility(igp.CharacterClass))
                         itemBonus += living.ItemBonus[eProperty.Acuity];
                 }
             }
@@ -147,6 +173,14 @@ namespace DOL.GS.PropertyCalc
                         itemBonusCapIncrease += living.ItemBonus[eProperty.AcuCapBonus];
                 }
             }
+            else if (living is IGamePlayer igp)
+            {
+                if (igp.CharacterClass != null && property == (eProperty) igp.CharacterClass.ManaStat)
+                {
+                    if (IsClassAffectedByAcuityAbility(igp.CharacterClass))
+                        itemBonusCapIncrease += living.ItemBonus[eProperty.AcuCapBonus];
+                }
+            }
 
             return Math.Min(itemBonusCapIncrease, itemBonusCapIncreaseCap);
         }
@@ -165,6 +199,14 @@ namespace DOL.GS.PropertyCalc
                 if (property == (eProperty) player.CharacterClass.ManaStat)
                 {
                     if (IsClassAffectedByAcuityAbility(player.CharacterClass))
+                        mythicalItemBonusCapIncrease += living.ItemBonus[eProperty.MythicalAcuCapBonus];
+                }
+            }
+            else if (living is IGamePlayer igp)
+            {
+                if (igp.CharacterClass != null && property == (eProperty) igp.CharacterClass.ManaStat)
+                {
+                    if (IsClassAffectedByAcuityAbility(igp.CharacterClass))
                         mythicalItemBonusCapIncrease += living.ItemBonus[eProperty.MythicalAcuCapBonus];
                 }
             }

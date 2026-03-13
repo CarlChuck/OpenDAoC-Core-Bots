@@ -810,7 +810,8 @@ namespace DOL.GS
             Level = owner.Level;
 
             // Set class identity first — needed for stat init and specs
-            SetCharacterClass(ClassId);
+            if (!SetCharacterClass(ClassId))
+                throw new InvalidOperationException($"Failed to set character class for class ID {ClassId}. Ensure the class ID is valid.");
             SetRaceAndRealm(owner);
 
             Name = string.IsNullOrEmpty(name) ? $"{owner.Name}'s {ClassName} Bot" : name;
@@ -1091,6 +1092,9 @@ namespace DOL.GS
 
         public virtual void LoadClassSpecializations(bool sendMessage)
         {
+            if (CharacterClass == null)
+                return;
+
             IDictionary<Specialization, int> careers = SkillBase.GetSpecializationCareer(CharacterClass.ID);
             var speclist = GetSpecList();
             var careerslist = careers.Keys.Select(k => k.KeyName.ToLower());

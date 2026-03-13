@@ -115,7 +115,14 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
             return;
         }
 
-        bot.SaveToDatabase();
+        try
+        {
+            bot.SaveToDatabase();
+        }
+        catch (Exception ex)
+        {
+            log.Warn($"Bot '{bot.Name}' could not be saved to database — continuing in-memory only.", ex);
+        }
 
         if (!BotManager.SpawnBot(bot))
         {
@@ -130,7 +137,9 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
             GroupMgr.AddGroup(group);
             group.AddMember(client.Player);
         }
-        client.Player.Group.AddMember(bot);
+
+        if (client.Player.Group != null)
+            client.Player.Group.AddMember(bot);
 
         // Auto-follow
         bot.Follow(client.Player, BotManager.FOLLOW_DISTANCE, BotManager.MAX_FOLLOW_DISTANCE);
