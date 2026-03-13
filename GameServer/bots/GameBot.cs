@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
-using log4net;
+using DOL.Logging;
 using DOL.AI.Brain;
 using DOL.Database;
 using DOL.Events;
@@ -18,7 +18,7 @@ namespace DOL.GS
 {
     public class GameBot : GameNPC, IGamePlayer
     {
-        private static new readonly ILog log = LogManager.GetLogger(typeof(GameBot));
+        private static new readonly Logger log = LoggerManager.Create(typeof(GameBot));
 
         #region Core Properties
 
@@ -266,7 +266,7 @@ namespace DOL.GS
             else
             {
                 ECSGameEffect effect = EffectListService.GetEffectOnTarget(this, eEffect.Sprint);
-                effect?.Stop();
+                effect?.End();
                 return false;
             }
         }

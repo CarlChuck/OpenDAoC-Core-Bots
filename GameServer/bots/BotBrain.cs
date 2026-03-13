@@ -11,13 +11,13 @@ using DOL.GS.PacketHandler;
 using DOL.GS.RealmAbilities;
 using DOL.GS.SkillHandler;
 using DOL.GS.Spells;
-using log4net;
+using DOL.Logging;
 
 namespace DOL.AI.Brain
 {
     public class BotBrain : ABrain, IOldAggressiveBrain
     {
-        private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
 
         public GameBot BotBody => Body as GameBot;
 

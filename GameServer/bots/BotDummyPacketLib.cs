@@ -57,6 +57,11 @@ namespace DOL.GS
         {
         }
 
+        public void SendChangeGroundTarget(int x, int y, int z)
+        {
+            throw new NotImplementedException();
+        }
+
         public void SendCharacterOverview(eRealm realm)
         {
         }
@@ -70,10 +75,6 @@ namespace DOL.GS
         }
 
         public void SendCharStatsUpdate()
-        {
-        }
-
-        public void SendCheckLos(GameObject source, GameObject target, CheckLosResponse callback)
         {
         }
 
@@ -111,6 +112,11 @@ namespace DOL.GS
 
         public void SendCustomDialog(string msg, CustomDialogResponse callback)
         {
+        }
+
+        public bool SendLosCheckRequest(GameObject source, GameObject target, ILosCheckListener listener)
+        {
+            throw new NotImplementedException();
         }
 
         public void SendCustomTextWindow(string caption, IList<string> text)
@@ -355,6 +361,11 @@ namespace DOL.GS
 
         public void SendMessage(string msg, eChatType type, eChatLoc loc)
         {
+        }
+
+        public void SendRawMessage(string msg, eChatType type, eChatLoc loc)
+        {
+            throw new NotImplementedException();
         }
 
         public void SendMinotaurRelicBarUpdate(GamePlayer player, int xp)
@@ -733,9 +744,5 @@ namespace DOL.GS
         {
         }
 
-        bool IPacketLib.SendCheckLos(GameObject source, GameObject target, CheckLosResponse callback)
-        {
-            return true;
-        }
     }
 }

@@ -1,7 +1,7 @@
 using System;
 using System.Linq;
 using System.Reflection;
-using log4net;
+using DOL.Logging;
 using DOL.GS.Commands;
 using DOL.GS.PacketHandler;
 
@@ -23,7 +23,7 @@ namespace DOL.GS
     "/bot resume [name]")]
 public class BotCommand : AbstractCommandHandler, ICommandHandler
 {
-    private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+    private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
     
     public void OnCommand(GameClient client, string[] args)
     {

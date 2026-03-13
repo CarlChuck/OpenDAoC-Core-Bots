@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using log4net;
+using DOL.Logging;
 using DOL.Database;
 using DOL.GS.Database;
 using DOL.Database.Attributes;
@@ -14,7 +14,7 @@ namespace DOL.GS
     /// </summary>
     public static class BotDatabase
     {
-        private static readonly ILog log = LogManager.GetLogger(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
 
         /// <summary>
         /// Save bot to database

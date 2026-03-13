@@ -147,7 +147,7 @@ namespace DOL.GS.Keeps
                 {
                     if (this.Component != null)
                     {
-                        Database.DbKeepCaptureLog keeplog = new Database.DbKeepCaptureLog();
+                        DbKeepCaptureLog keeplog = new DbKeepCaptureLog();
                         keeplog.KeepName = Component.Keep.Name;
 
                         if (Component.Keep is GameKeep)
