@@ -441,12 +441,12 @@ namespace DOL.GS.ServerRules
                 if (npcDefender.Realm is eRealm.None && npcAttacker is GameGuard && npcDefender is not GameTrainingDummy)
                     return true;
 
-                // Anything can attack pets.
-                if (npcDefender is GameSummonedPet || npcDefender.Brain is ControlledMobBrain)
+                // Anything can attack pets and bots.
+                if (npcDefender is GameSummonedPet || npcDefender.Brain is ControlledMobBrain || npcDefender.Brain is BotBrain)
                     return true;
 
-                // Pets can attack everything.
-                if (npcAttacker is GameSummonedPet || npcAttacker.Brain is ControlledMobBrain)
+                // Pets and bots can attack everything.
+                if (npcAttacker is GameSummonedPet || npcAttacker.Brain is ControlledMobBrain || npcAttacker.Brain is BotBrain)
                     return true;
 
                 // Mobs can attack mobs only if they both have a faction or if any is confused.

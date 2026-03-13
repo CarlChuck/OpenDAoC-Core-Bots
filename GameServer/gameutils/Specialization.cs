@@ -193,6 +193,47 @@ namespace DOL.GS
 				}
 				
 			}
+			else if (living is GameBot bot && bot.CharacterClass != null)
+			{
+				int classId = bot.CharacterClass.ID;
+
+				// Apply the same class-based filtering as GamePlayer
+				var baseline = spsl.Where(item => item.Item1.IsBaseLine && item.Item2 == classId);
+				if (baseline.Any())
+				{
+					foreach (var ls in baseline)
+					{
+						ls.Item1.Level = living.Level;
+						list.Add(ls.Item1);
+					}
+				}
+				else
+				{
+					foreach (var ls in spsl.Where(item => item.Item1.IsBaseLine && item.Item2 == 0))
+					{
+						ls.Item1.Level = living.Level;
+						list.Add(ls.Item1);
+					}
+				}
+
+				var specline = spsl.Where(item => !item.Item1.IsBaseLine && item.Item2 == classId);
+				if (specline.Any())
+				{
+					foreach (var ls in specline)
+					{
+						ls.Item1.Level = Math.Max(1, living.Level - (living.Level >> 2));
+						list.Add(ls.Item1);
+					}
+				}
+				else
+				{
+					foreach (var ls in spsl.Where(item => !item.Item1.IsBaseLine && item.Item2 == 0))
+					{
+						ls.Item1.Level = Math.Max(1, living.Level - (living.Level >> 2));
+						list.Add(ls.Item1);
+					}
+				}
+			}
 			else
 			{
 				// default - not a player, add all...
