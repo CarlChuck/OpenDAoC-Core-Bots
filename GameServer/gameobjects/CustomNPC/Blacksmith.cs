@@ -204,25 +204,7 @@ public class Blacksmith : GameNPC
         ChatUtil.SendSystemMessage(player, "GameNPC.Blacksmith.YouPay", GetName(0, false),
             Money.GetString(item.RepairCost));
 
-        // Items with IsNotLosingDur are not....losing DUR.
-        if (ToRecoverCond + 1 >= item.Durability)
-        {
-            item.Condition = item.Condition + item.Durability;
-            item.Durability = 0;
-            // Message: {0} says, "Uhh, {1} is rather old. I won't be able to repair it again, so be careful!"
-            ChatUtil.SendSayMessage(player, "GameNPC.Blacksmith.ObjectRatherOld", GetName(0, true),
-                item.GetName(0, false));
-        }
-        else
-        {
-            item.Condition = item.MaxCondition;
-            if (!item.IsNotLosingDur) item.Durability -= ToRecoverCond + 1;
-        }
-
-
-        player.Out.SendInventoryItemsUpdate(new[] {item});
-        // Message: {0} says, "There, {1} is ready for combat."
-        ChatUtil.SendSayMessage(player, "GameNPC.Blacksmith.ItsDone", GetName(0, true), item.GetName(0, false));
+        Repair(item, player);
     }
 
     #endregion Repair Responses
@@ -231,40 +213,29 @@ public class Blacksmith : GameNPC
 
     private void AskRepairAll(GamePlayer player)
     {
-        long TotalCost = 0;
-        foreach (var inventoryItem in player.Inventory.AllItems)
+        bool foundItemToRepair = false;
+        long cost = 0;
+
+        foreach (DbInventoryItem inventoryItem in player.Inventory.AllItems)
         {
-            if (!CanBeRepaired(inventoryItem)) continue;
-            TotalCost += CalculateCost(inventoryItem);
+            if (!CanBeRepaired(inventoryItem))
+                continue;
+
+            foundItemToRepair = true;
+            cost += inventoryItem.RepairCost;
         }
 
-        if (TotalCost > 0)
-            player.Client.Out.SendCustomDialog(
-                $"It will cost {Money.GetString(TotalCost)} to repair everything. Do you accept?", RepairAll);
+        cost = (long) (cost * (1 + REPAIR_ALL_TAX));
+
+        if (foundItemToRepair)
+            player.Client.Out.SendCustomDialog($"It will cost {Money.GetString(cost)} to repair everything. Do you accept?", RepairAll);
         else
-            SayTo(player, eChatLoc.CL_PopupWindow,
-                "All items are fully repaired already.");
+            SayTo(player, eChatLoc.CL_PopupWindow, "All items are fully repaired already.");
     }
 
-    private bool CanBeRepaired(DbInventoryItem item)
+    private static bool CanBeRepaired(DbInventoryItem item)
     {
-        if (item == null || item.SlotPosition == (int) eInventorySlot.Ground
-                         || item.OwnerID == null) return false;
-        if (item.Condition == item.MaxCondition) return false;
-        if (item.RepairCost == 0) return false; // skipping items with no template price - hopefully we'll get tickets and we'll adjust the prices
-
-        return true;
-    }
-
-    private long CalculateCost(DbInventoryItem item)
-    {
-        long NeededMoney = 0;
-        NeededMoney = ((item.Template.MaxCondition - item.Condition) * item.Template.Price) /
-                      item.Template.MaxCondition;
-
-        var tax = NeededMoney * REPAIR_ALL_TAX;
-
-        return NeededMoney + (long) tax;
+        return item != null && item.Condition < item.MaxCondition && item.Durability > 0;
     }
 
     private void RepairAll(GamePlayer player, byte response)
@@ -279,11 +250,16 @@ public class Blacksmith : GameNPC
         }
 
         long cost = 0;
-        foreach (var inventoryItem in player.Inventory.AllItems)
+
+        foreach (DbInventoryItem inventoryItem in player.Inventory.AllItems)
         {
-            if (!CanBeRepaired(inventoryItem)) continue;
-            cost += CalculateCost(inventoryItem);
+            if (!CanBeRepaired(inventoryItem))
+                continue;
+
+            cost += inventoryItem.RepairCost;
         }
+
+        cost = (long) (cost * (1 + REPAIR_ALL_TAX));
 
         if (!player.RemoveMoney(cost))
         {
@@ -293,42 +269,26 @@ public class Blacksmith : GameNPC
             return;
         }
 
-
         InventoryLogging.LogInventoryAction(player, this, eInventoryActionType.Merchant, cost);
 
         ChatUtil.SendSystemMessage(player, "GameNPC.Blacksmith.YouPay", GetName(0, false),
             Money.GetString(cost));
 
-
-        foreach (var inventoryItem in player.Inventory.AllItems)
-        {
+        foreach (DbInventoryItem inventoryItem in player.Inventory.AllItems)
             Repair(inventoryItem, player);
-            player.Out.SendInventoryItemsUpdate(new[] {inventoryItem});
-        }
-
-        SayTo(player, eChatLoc.CL_PopupWindow,
-            LanguageMgr.GetTranslation(player.Client.Account.Language,
-                "Scripts.Recharger.RechargerDialogResponse.FullyCharged"));
     }
 
     private void Repair(DbInventoryItem item, GamePlayer player)
     {
-        var ToRecoverCond = item.MaxCondition - item.Condition;
+        if (!GS.Repair.ModifyConditionAndDurability(item))
+            return;
 
-        // Items with IsNotLosingDur are not....losing DUR.
-        if (ToRecoverCond + 1 >= item.Durability)
-        {
-            item.Condition = +item.Durability;
-            item.Durability = 0;
-            // Message: {0} says, "Uhh, {1} is rather old. I won't be able to repair it again, so be careful!"
-            ChatUtil.SendSayMessage(player, "GameNPC.Blacksmith.ObjectRatherOld", GetName(0, true),
-                item.GetName(0, false));
-        }
+        if (item.Durability <= 0)
+            ChatUtil.SendSayMessage(player, "GameNPC.Blacksmith.ObjectRatherOld", GetName(0, true), item.GetName(0, false));
         else
-        {
-            item.Condition = item.MaxCondition;
-            if (!item.IsNotLosingDur) item.Durability -= ToRecoverCond + 1;
-        }
+            ChatUtil.SendSayMessage(player, "GameNPC.Blacksmith.ItsDone", GetName(0, true), item.GetName(0, false));
+
+        player.Out.SendInventoryItemsUpdate([item]);
     }
 
     #endregion

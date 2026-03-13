@@ -1,20 +1,13 @@
 using System;
-using System.Collections.Generic;
-using System.Reflection;
 using DOL.GS.ServerProperties;
 using DOL.GS.Styles;
 
 namespace DOL.GS.PacketHandler.Client.v168
 {
     [PacketHandlerAttribute(PacketHandlerType.TCP, eClientPackets.UseSkill, "Handles Player Use Skill Request.", eClientStatus.PlayerInGame)]
-    public class UseSkillHandler : IPacketHandler
+    public class UseSkillHandler : PacketHandler
     {
-        /// <summary>
-        /// Defines a logger for this class.
-        /// </summary>
-        private static readonly Logging.Logger log = Logging.LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
-
-        public void HandlePacket(GameClient client, GSPacketIn packet)
+        protected override void HandlePacketInternal(GameClient client, GSPacketIn packet)
         {
             if (client.Player.ObjectState is not GameObject.eObjectState.Active || client.ClientState is not GameClient.eClientState.Playing)
                 return;
@@ -47,7 +40,7 @@ namespace DOL.GS.PacketHandler.Client.v168
             player.TargetInView = (flagSpeedData & 0xa000) != 0; // why 2 bits? that has to be figured out
             player.GroundTargetInView = ((flagSpeedData & 0x1000) != 0);
 
-            List<Tuple<Skill, Skill>> snap = player.GetAllUsableSkills();
+            var snap = player.GetAllUsableSkills();
             Skill sk = null;
             Skill sksib = null;
 
@@ -79,42 +72,6 @@ namespace DOL.GS.PacketHandler.Client.v168
             {
                 player.Out.SendMessage("Skill is not implemented.", eChatType.CT_Advise, eChatLoc.CL_SystemWindow);
                 return;
-            }
-
-            // Test if we can use it !
-            int reuseTime = player.GetSkillDisabledDuration(sk);
-
-            if (reuseTime > 60000)
-            {
-                player.Out.SendMessage(
-                    string.Format("You must wait {0} minutes {1} seconds to use this ability!", reuseTime/60000, reuseTime%60000/1000),
-                    eChatType.CT_System, eChatLoc.CL_SystemWindow);
-
-                if (player.Client.Account.PrivLevel < 2)
-                    return;
-            }
-            else if (reuseTime > 0)
-            {
-                // Allow Pulse Spells to be canceled while they are on reusetimer
-                if (sk is Spell spell && spell.IsPulsing && player.ActivePulseSpells.ContainsKey(spell.SpellType))
-                {
-                    ECSPulseEffect effect = EffectListService.GetPulseEffectOnTarget(player, spell);
-
-                    if (effect != null)
-                    {
-                        effect.Stop();
-
-                        if (spell.InstrumentRequirement == 0)
-                            player.Out.SendMessage("You cancel your effect.", eChatType.CT_Spell, eChatLoc.CL_SystemWindow);
-                        else
-                            player.Out.SendMessage("You stop playing your song.", eChatType.CT_Spell, eChatLoc.CL_SystemWindow);
-                    }
-                }
-                else
-                    player.Out.SendMessage(string.Format("You must wait {0} seconds to use this ability!", reuseTime / 1000 + 1), eChatType.CT_System, eChatLoc.CL_SystemWindow);
-
-                if (player.Client.Account.PrivLevel < 2)
-                    return;
             }
 
             // See what we should do depending on skill type !

@@ -13,12 +13,13 @@ namespace DOL.GS.Spells
         // Inherits `SingleStatDebuff` so that resist debuffs can get the 25% effectiveness bonus from specialization.
         // Resist buffs don't.
 
+        public override string ShortDescription => $"Decreases the target's resistance to {PropertyToString(Property1)} damage by {Spell.Value}%.";
         public abstract string DebuffTypeName { get; }
         public override eBuffBonusCategory BonusCategory1 => eBuffBonusCategory.Debuff;
 
         public override ECSGameSpellEffect CreateECSEffect(in ECSGameEffectInitParams initParams)
         {
-            return ECSGameEffectFactory.Create(initParams, static (in ECSGameEffectInitParams i) => new StatDebuffECSEffect(i));
+            return ECSGameEffectFactory.Create(initParams, static (in i) => new StatDebuffECSEffect(i));
         }
 
         protected override int CalculateEffectDuration(GameLiving target)
@@ -39,9 +40,6 @@ namespace DOL.GS.Spells
         public override void ApplyEffectOnTarget(GameLiving target)
         {
             base.ApplyEffectOnTarget(target);
-
-            if (target is GameNPC npc && npc.Brain is StandardMobBrain brain)
-                brain.AddToAggroList(Caster, 1);
 
             if (Spell.CastTime > 0)
                 target.StartInterruptTimer(target.SpellInterruptDuration, AttackData.eAttackType.Spell, Caster);
@@ -91,7 +89,7 @@ namespace DOL.GS.Spells
                 [
                     LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "ResistDebuff.DelveInfo.Function"),
                     " ",
-                    Spell.Description,
+                    ShortDescription,
                     " ",
                     string.Format(LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "ResistDebuff.DelveInfo.Decrease", DebuffTypeName, m_spell.Value)),
                     LanguageMgr.GetTranslation((Caster as GamePlayer).Client, "DelveInfo.Target", Spell.Target),
@@ -197,6 +195,8 @@ namespace DOL.GS.Spells
     [SpellHandler(eSpellType.CrushSlashThrustDebuff)]
     public class CrushSlashThrustDebuff(GameLiving caster, Spell spell, SpellLine line) : AbstractResistDebuff(caster, spell, line)
     {
+        public override string ShortDescription => $"Decreases the target's resistance to melee damage by {Spell.Value}%.";
+
         public override eBuffBonusCategory BonusCategory1 => eBuffBonusCategory.Debuff;
         public override eBuffBonusCategory BonusCategory2 => eBuffBonusCategory.Debuff;
         public override eBuffBonusCategory BonusCategory3 => eBuffBonusCategory.Debuff;

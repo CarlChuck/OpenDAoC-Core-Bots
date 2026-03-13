@@ -30,7 +30,7 @@ namespace DOL.GS.Spells
 		{
 			if (Caster.ObjectState != GameObject.eObjectState.Active)
 				return;
-			if (Caster.IsStunned || Caster.IsMezzed)
+			if (Caster.IsCrowdControlled)
 				return;
 
 			//(Caster as GamePlayer).Out.SendCheckLOS(Caster, m_spellTarget, CheckLOSPlayerToTarget);
@@ -83,7 +83,7 @@ namespace DOL.GS.Spells
 
 			foreach (GameLiving t in targets)
 			{
-				if (Util.ChanceDouble(CalculateSpellResistChance(t)))
+				if (Util.Chance(CalculateSpellResistChance(t)))
 				{
 					OnSpellNegated(target, SpellNegatedReason.Resisted);
 					continue;
@@ -153,7 +153,7 @@ namespace DOL.GS.Spells
 			dbSpell.Icon = Spell.Icon;
 			dbSpell.Type = eSpellType.SpeedDecrease.ToString();
 			dbSpell.Duration = (Spell.Radius == 0) ? 10 : 3;
-			dbSpell.Target = "Enemy";
+			dbSpell.Target = eSpellTarget.ENEMY.ToString();
 			dbSpell.Range = 1500;
 			dbSpell.Value = Spell.Value;
 			dbSpell.Name = Spell.Name + " Snare";

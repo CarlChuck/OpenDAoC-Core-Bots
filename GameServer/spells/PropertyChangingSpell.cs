@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Frozen;
+using System.Collections.Generic;
 using DOL.AI.Brain;
 using DOL.Database;
 using DOL.GS.Effects;
 using DOL.GS.PacketHandler;
 using DOL.GS.PropertyCalc;
+using DOL.Logging;
 
 namespace DOL.GS.Spells
 {
@@ -13,11 +16,37 @@ namespace DOL.GS.Spells
 	/// </summary>
 	public abstract class PropertyChangingSpell : SpellHandler
 	{
-		private static readonly Logging.Logger log = Logging.LoggerManager.Create(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+		private static readonly Logger log = LoggerManager.Create(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
+		private static FrozenDictionary<eProperty, string> _propertyToStringMap =
+			new Dictionary<eProperty, string>()
+			{
+				{eProperty.Strength, "strength" },
+				{eProperty.Constitution, "constitution" },
+				{eProperty.Dexterity, "dexterity" },
+				{eProperty.Quickness, "quickness" },
+				{eProperty.Acuity, "acuity" },
+				{eProperty.ArmorFactor, "armor factor" },
+				{eProperty.ArmorAbsorption, "armor absorption" },
+				{eProperty.PhysicalAbsorption, "physical absorption" },
+				{eProperty.WeaponSkill, "weaponskill" },
+				{eProperty.Resist_Slash, "slash" },
+				{eProperty.Resist_Crush, "crush" },
+				{eProperty.Resist_Thrust, "thrust" },
+				{eProperty.Resist_Heat, "heat" },
+				{eProperty.Resist_Cold, "cold" },
+				{eProperty.Resist_Matter, "matter" },
+				{eProperty.Resist_Body, "body" },
+				{eProperty.Resist_Spirit, "spirit" },
+				{eProperty.Resist_Energy, "energy" },
+				{eProperty.Resist_Natural, "essence" },
+			}.ToFrozenDictionary();
+
+		public PropertyChangingSpell(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
 
 		public override ECSGameSpellEffect CreateECSEffect(in ECSGameEffectInitParams initParams)
 		{
-			return ECSGameEffectFactory.Create(initParams, static (in ECSGameEffectInitParams i) => new StatBuffECSEffect(i));
+			return ECSGameEffectFactory.Create(initParams, static (in i) => new StatBuffECSEffect(i));
 		}
 
 		/// <summary>
@@ -43,7 +72,7 @@ namespace DOL.GS.Spells
 					if (instrument != null)
 					{
 						duration *= 1.0 + Math.Min(1.0, instrument.Level / (double)Caster.Level); // up to 200% duration for songs
-						duration *= instrument.Condition / (double)instrument.MaxCondition * instrument.Quality / 100;
+						duration *= instrument.Quality * 0.01 * instrument.ConditionPercent * 0.01;
 					}
 				}
 
@@ -465,23 +494,23 @@ namespace DOL.GS.Spells
 		/// <param name="BonusCat"></param>
 		/// <param name="Property"></param>
 		/// <param name="Value"></param>
-		/// <param name="IsSubstracted"></param>
-		protected void ApplyBonus(GameLiving owner,  eBuffBonusCategory BonusCat, eProperty Property, int Value, bool IsSubstracted)
+		/// <param name="IsSubtracted"></param>
+		protected void ApplyBonus(GameLiving owner,  eBuffBonusCategory BonusCat, eProperty Property, int Value, bool IsSubtracted)
 		{
 			IPropertyIndexer tblBonusCat;
 			if (Property != eProperty.Undefined)
 			{
 				tblBonusCat = GetBonusCategory(owner, BonusCat);
-				if (IsSubstracted)
+				if (IsSubtracted)
 					tblBonusCat[Property] -= Value;
 				else
 					tblBonusCat[Property] += Value;
 			}
 		}
 
-		// constructor
-		public PropertyChangingSpell(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line)
+		protected static string PropertyToString(eProperty property)
 		{
+			return _propertyToStringMap.TryGetValue(property, out string result) ? result : $"<{property}>";
 		}
 	}
 }

@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Reflection;
 using System.Threading;
+using DOL.Logging;
 
 namespace DOL.GS
 {
@@ -42,7 +44,7 @@ namespace DOL.GS
 
             _objects[(int) node.Value.GameObjectType].Remove(node, OnRemoveObject);
 
-            void OnRemoveObject(LinkedListNode<GameObject> node)
+            static void OnRemoveObject(LinkedListNode<GameObject> node)
             {
                 node.Value.SubZoneObject.CurrentSubZone = null;
             }
@@ -71,22 +73,84 @@ namespace DOL.GS
         public WriteLockedLinkedList<GameObject> this[eGameObjectType objectType] => _objects[(int) objectType];
     }
 
-    // A wrapper for a 'LinkedListNode<GameObject>'.
-    public class SubZoneObject
+    // This class serves two purposes:
+    // * Wraps a `LinkedListNode<GameObject>`, representing a game object in a `SubZone`.
+    // * Serves as an object to be added to `ServiceObjectStore` and consumed by `ZoneService`, to move the game object from one `SubZone` to another.
+    public class SubZoneObject : IServiceObject
     {
+        private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
+
+        private bool _isInitiatingTransition; // Guard. Only true for the duration of the `InitiateSubZoneTransition` method execution.
+        private bool _isTransitionQueued;     // Persistent state flag indicating that the object will be processed by `ZoneService`.
+
         public LinkedListNode<GameObject> Node { get; }
         public SubZone CurrentSubZone { get; set; }
-        private int _isChangingSubZone;
-        public bool StartSubZoneChange => Interlocked.Exchange(ref _isChangingSubZone, 1) == 0; // Returns true the first time it's called.
+        public Zone DestinationZone { get; private set; }
+        public SubZone DestinationSubZone { get; private set; }
+        public ServiceObjectId ServiceObjectId { get; } = new(ServiceObjectType.SubZoneObject);
 
         public SubZoneObject(GameObject obj)
         {
             Node = new(obj);
         }
 
-        public void ResetSubZoneChange()
+        public void InitiateSubZoneTransition(Zone destinationZone, SubZone destinationSubZone)
         {
-            _isChangingSubZone = 0;
+            // Disallow concurrent calls.
+            if (Interlocked.CompareExchange(ref _isInitiatingTransition, true, false) != false)
+            {
+                if (log.IsWarnEnabled)
+                    log.Warn($"Concurrent call to {nameof(InitiateSubZoneTransition)} detected for {Node.Value}.");
+
+                return;
+            }
+
+            try
+            {
+                DestinationZone = destinationZone;
+                DestinationSubZone = destinationSubZone;
+
+                // Early out if there's already a pending transition.
+                if (_isTransitionQueued)
+                    return;
+
+                if (!ServiceObjectStore.Add(this))
+                {
+                    // If adding failed, we must revert the state to be non-pending.
+                    if (log.IsErrorEnabled)
+                        log.Error($"SubZone transition for {Node.Value} couldn't be added to {nameof(ServiceObjectStore)}.");
+
+                    DestinationZone = null;
+                    DestinationSubZone = null;
+                    return;
+                }
+
+                _isTransitionQueued = true;
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _isInitiatingTransition, false);
+            }
+        }
+
+        public void OnSubZoneTransition()
+        {
+            // Only meant to be called by the zone service.
+
+            if (!_isTransitionQueued)
+                return;
+
+            if (!ServiceObjectStore.Remove(this))
+            {
+                if (log.IsErrorEnabled)
+                    log.Error($"SubZone transition for {Node.Value} couldn't be removed from {nameof(ServiceObjectStore)}.");
+
+                return;
+            }
+
+            _isTransitionQueued = false;
+            DestinationZone = null;
+            DestinationSubZone = null;
         }
 
         public void CheckForRelocation()

@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Threading;
 using DOL.Database;
 using DOL.GS.Keeps;
+using DOL.Logging;
 
 namespace DOL.GS
 {
@@ -12,11 +13,11 @@ namespace DOL.GS
 	/// </summary>
 	public sealed class DoorMgr
 	{
-		private static readonly Logging.Logger log = Logging.LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
+		private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
 
 		private static readonly Lock Lock = new();
 
-		private static Dictionary<int, List<GameDoorBase>> m_doors = new Dictionary<int, List<GameDoorBase>>();
+		private static Dictionary<int, GameDoorBase> m_doors = new();
 
 		public const string WANT_TO_ADD_DOORS = "WantToAddDoors";
 
@@ -45,17 +46,14 @@ namespace DOL.GS
 			{
 				lock (Lock)
 				{
-					foreach (List<GameDoorBase> doorList in m_doors.Values)
+					foreach (GameDoorBase door in m_doors.Values)
 					{
-						foreach (GameDoorBase door in doorList)
+						if (door.DbDoor != null &&
+							door is GameKeepDoor keepDoor &&
+							keepDoor.IsAttackableDoor)
 						{
-							if (door.DbDoor != null &&
-								door is GameKeepDoor keepDoor &&
-								keepDoor.IsAttackableDoor)
-							{
-								keepDoor.SaveIntoDatabase();
-								count++;
-							}
+							keepDoor.SaveIntoDatabase();
+							count++;
 						}
 					}
 				}
@@ -108,17 +106,30 @@ namespace DOL.GS
 		{
 			lock (Lock)
 			{
-				if (!m_doors.TryGetValue(door.DoorId, out List<GameDoorBase> doorsOfId))
+				if (m_doors.TryGetValue(door.DoorId, out GameDoorBase existingDoor))
 				{
-					doorsOfId = [];
-					m_doors.Add(door.DoorId, doorsOfId);
+					if (door == existingDoor)
+						return;
+				}
+				else
+				{
+					// Track doors that can't be opened via interaction, so they can be treated as obstacles.
+					if (!door.CanBeOpenedViaInteraction && !PathfindingProvider.Instance.RegisterDoor(door) && log.IsErrorEnabled)
+					{
+						log.Error($"Failed to register door in pathfinding provider, possible navmesh/object location mismatch " +
+							$"(Id: {door.DoorId}) " +
+							$"(Name: {door.Name}) " +
+							$"(Loc: {door.X},{door.Y},{door.Z}) " +
+							$"(ZoneId: {door.CurrentZone?.ID}) " +
+							$"(RegionId: {door.CurrentRegionID})");
+					}
 				}
 
-				doorsOfId.Add(door);
+				m_doors[door.DoorId] = door;
 			}
 		}
 
-		public static void UnRegisterDoor(int doorID)
+		public static void UnregisterDoor(int doorID)
 		{
 			m_doors.Remove(doorID);
 		}
@@ -127,9 +138,9 @@ namespace DOL.GS
 		/// This function get the door object by door index
 		/// </summary>
 		/// <returns>return the door with the index</returns>
-		public static List<GameDoorBase> GetDoorByID(int id)
+		public static GameDoorBase GetDoorByID(int id)
 		{
-			return m_doors.TryGetValue(id, out List<GameDoorBase> value) ? value : [];
+			return m_doors.TryGetValue(id, out GameDoorBase value) ? value : null;
 		}
 	}
 }

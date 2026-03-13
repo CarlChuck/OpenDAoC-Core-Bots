@@ -271,7 +271,7 @@ namespace DOL.GS.ServerProperties
 		[ServerProperty("system", "use_npcguildscripts", "Use the NPC Guild Scripts", true)]
 		public static bool USE_NPCGUILDSCRIPTS;
 
-		[ServerProperty("system", "game_loop_tick_rate", "Minimum amount of milliseconds that must pass since the current tick started before starting the next one. Higher values reduce CPU usage but make the game less responsive.", 30)]
+		[ServerProperty("system", "game_loop_tick_rate", "How many ticks per second the game loop tries to run at. If it can't keep up, the logic will effectively run slower than intended.", 30)]
 		public static int GAME_LOOP_TICK_RATE;
 
 		#endregion
@@ -708,12 +708,6 @@ namespace DOL.GS.ServerProperties
 		/// </summary>
 		[ServerProperty("world", "zonepoint_npctemplate", "Display the zonepoint with the following npctemplate. 0 for no display", 0)]
 		public static int ZONEPOINT_NPCTEMPLATE;
-
-		/// <summary>
-		/// Property to cause beneficial spells to target the caster if current target isn't valid
-		/// </summary>
-		[ServerProperty("server", "autoselect_caster", "Set to True if you wish beneficial spells to target the caster if the current target isn't valid.  Allows self-healing without changing targets.", false)]
-		public static bool AUTOSELECT_CASTER;
 		#endregion
 
 		#region RATES
@@ -1162,20 +1156,8 @@ namespace DOL.GS.ServerProperties
 		/// <summary>
 		/// Scale pet spell values according to their level?
 		/// </summary>
-		[ServerProperty("npc", "pet_scale_spell_max_level", "Disabled if 0 or less. If greater than 0, this value is the level at which pets cast their spells at 100% effectiveness, so choose spells for pets assuming they're at the level set here. Live is max pet level, 44 or 50 depending on patch.", 44)]
-		public static int PET_SCALE_SPELL_MAX_LEVEL;
-
-		/// <summary>
-		/// Scale pet spell values according to their level?
-		/// </summary>
 		[ServerProperty("npc", "pet_bd_commander_taunt_multiplier", "Percentage of damage that BD commanders get as extra aggro when taunting, e.g. a taunting BD commander gets 150% normal aggro at 50, 200% at 100, 250% at 150 etc. ", 150)]
 		public static int PET_BD_COMMANDER_TAUNT_VALUE;
-
-		/// <summary>
-		/// Scale pet spell values according to their level?
-		/// </summary>
-		[ServerProperty("npc", "pet_cap_bd_minion_spell_scaling_by_spec", "When scaling BD minion spells, do we cap the level they scale do by the BD's spec level?  This provides an incentive to spec darkness and suppression and use items that boost them.", false)]
-		public static bool PET_CAP_BD_MINION_SPELL_SCALING_BY_SPEC;
 
 		/// <summary>
 		/// Minimum respawn time for npc's without a set respawninterval
@@ -1228,7 +1210,7 @@ namespace DOL.GS.ServerProperties
 		/// <summary>
 		/// How often, in milliseconds, to check follow distance.  Lower numbers make NPC follow closer but increase load on server.
 		/// </summary>
-		[ServerProperty("npc", "gamenpc_followcheck_time", "How often, in milliseconds, to check follow distance. Lower numbers make NPC follow closer but increase load on server.", 500)]
+		[ServerProperty("npc", "gamenpc_followcheck_time", "How often, in milliseconds, to check follow distance. Lower numbers make NPC follow closer but increase load on server.", 100)]
 		public static int GAMENPC_FOLLOWCHECK_TIME;
 
 		/// <summary>
@@ -1242,12 +1224,6 @@ namespace DOL.GS.ServerProperties
 		/// </summary>
 		[ServerProperty("npc", "gamenpc_chances_to_style", "Change the chance to fire a style for a mob or a pet", 20)]
 		public static int GAMENPC_CHANCES_TO_STYLE;
-
-		/// <summary>
-		/// Chances for npc (including pet) to cast (chance is calculated randomly according to this value + the number of spells the NPC own)
-		/// </summary>
-		[ServerProperty("npc", "gamenpc_chances_to_cast", "Change the chance to cast a spell for a mob or a pet", 25)]
-		public static int GAMENPC_CHANCES_TO_CAST;
 
 		/// <summary>
 		/// NPCs heal when a target is below what percentage of their health?
@@ -1276,11 +1252,6 @@ namespace DOL.GS.ServerProperties
 		#endregion
 
 		#region PVP / RVR
-		/// <summary>
-		/// Grace period in minutes to allow relog near enemy structure after link death
-		/// </summary>
-		[ServerProperty("pvp", "RvRLinkDeathRelogGracePeriod", "The Grace Period in minutes, to allow to relog near enemy structure after a link death.", "20")]
-		public static string RVR_LINK_DEATH_RELOG_GRACE_PERIOD;
 
 		/// <summary>
 		/// PvP Immunity Timer - Killed by Mobs
@@ -1624,10 +1595,10 @@ namespace DOL.GS.ServerProperties
 		public static bool PVP_UNCLAIMED_KEEPS_ENEMY;
 
 		/// <summary>
-		/// Should players that log near enemy keeps be teleported to a safe area when logging in?
+		/// Grace period in minutes to allow relog near enemy structure after link death
 		/// </summary>
-		[ServerProperty("keeps", "teleport_login_near_enemy_keep", "Should players that log near enemy keeps be teleported to a safe area?", true)]
-		public static bool TELEPORT_LOGIN_NEAR_ENEMY_KEEP;
+		[ServerProperty("keeps", "NearKeepRelogGracePeriod", "The grace period in minutes, to allow to relog near an enemy structure.", 3)]
+		public static int NEAR_KEEP_RELOG_GRACE_PERIOD;
 
 		/// <summary>
 		/// Should players that exceed BG level cap be moved out of BG when logging in?
@@ -2108,7 +2079,7 @@ namespace DOL.GS.ServerProperties
 		/// <summary>
 		/// Enable logging of all market activity
 		/// </summary>
-		[ServerProperty("housing", "market_enable_log", "Enable debug logging of all market activity", true)]
+		[ServerProperty("housing", "market_enable_log", "Enable debug logging of all market activity", false)]
 		public static bool MARKET_ENABLE_LOG;
 
 		/// <summary>
@@ -2231,6 +2202,12 @@ namespace DOL.GS.ServerProperties
 		[ServerProperty("classes", "ress_sickness_level", "What level should ress sickness start to apply?", (byte)6)]
 		public static byte RESS_SICKNESS_LEVEL;
 
+		[ServerProperty("classes", "volley_roof_check", "Enables roof obstruction checks for Volley", false)]
+		public static bool VOLLEY_ROOF_CHECK;
+
+		[ServerProperty("classes", "ground_target_snap_max_distance", "Max snap distance for ground-targets onto a walkable surface. Failed checks invalidate the ground target. (0 = disabled)", 32f)]
+		public static float GROUND_TARGET_SNAP_MAX_DISTANCE;
+
 		#endregion
 
 		#region SPELLS
@@ -2241,12 +2218,6 @@ namespace DOL.GS.ServerProperties
 		[ServerProperty("spells", "spell_interrupt_duration", "", 3000)]
 		public static int SPELL_INTERRUPT_DURATION;
 
-		[ServerProperty("spells", "spell_interrupt_again", "", 100)]
-		public static int SPELL_INTERRUPT_AGAIN;
-
-		[ServerProperty("spells", "spell_interrupt_maxstagelength", "Max length of stage 1 and 3, 1000 = 1 second", 1500)]
-		public static int SPELL_INTERRUPT_MAXSTAGELENGTH;
-		
 		[ServerProperty("spells", "spell_charm_named_check", "Prevents charm spell to work on Named Mobs, 0 = disable, 1 = enable", 1)]
 		public static int SPELL_CHARM_NAMED_CHECK;
 
@@ -2585,14 +2556,14 @@ namespace DOL.GS.ServerProperties
 				{
 					foreach (Type type in asm.GetTypes())
 					{
-						foreach (FieldInfo field in type.GetFields())
+						foreach (FieldInfo fld in type.GetFields())
 						{
 							// Properties are Static
-							if (!field.IsStatic)
+							if (!fld.IsStatic)
 								continue;
 							
 							// Properties shoud contain a property attribute
-							object[] attribs = field.GetCustomAttributes(typeof(ServerPropertyAttribute), false);
+							object[] attribs = fld.GetCustomAttributes(typeof(ServerPropertyAttribute), false);
 							if (attribs.Length == 0)
 								continue;
 							
@@ -2620,7 +2591,7 @@ namespace DOL.GS.ServerProperties
 								serverProp.Value = serverProp.DefaultValue;
 							}
 							
-							result[att.Key] = new Tuple<ServerPropertyAttribute, FieldInfo, DbServerProperty>(att, field, serverProp);
+							result[att.Key] = new Tuple<ServerPropertyAttribute, FieldInfo, DbServerProperty>(att, fld, serverProp);
 						}
 					}
 				}

@@ -8,6 +8,11 @@ namespace DOL.GS.Spells
     [SpellHandler(eSpellType.Heal)]
     public class HealSpellHandler : SpellHandler
     {
+        public override string ShortDescription =>
+            Spell.Value > 0 ?
+            $"Heals the target for {Spell.Value} hit points." :
+            $"Heals the target for {Math.Abs(Spell.Value)}% hit points.";
+
         public HealSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
 
         public override bool StartSpell(GameLiving target)
@@ -20,11 +25,24 @@ namespace DOL.GS.Spells
             if (targets.Count <= 0)
                 return false;
 
+            double spellValue = m_spell.Value;
+            double min, max;
+
+            if (spellValue < 0)
+            {
+                spellValue = spellValue / -100.0 * m_caster.MaxHealth;
+                min = max = 1.0;
+            }
+            else
+                CalculateDamageVariance(null, out min, out max);
+
             bool healed = false;
-            CalculateDamageVariance(null, out double minHealVariance, out double maxHealVariance);
 
             foreach (GameLiving healTarget in targets)
-                healed |= HealTarget(healTarget, minHealVariance + Util.RandomDoubleIncl() * (maxHealVariance - minHealVariance));
+            {
+                double variance = min + Caster.GetPseudoDoubleIncl(RandomDeckEvent.DamageVariance) * (max - min);
+                healed |= HealTarget(healTarget, spellValue * variance, true);
+            }
 
             // Group heals seem to use full power even if no heal happens.
             if (!healed && Spell.Target is eSpellTarget.REALM)
@@ -47,7 +65,7 @@ namespace DOL.GS.Spells
             return true;
         }
 
-        public virtual bool HealTarget(GameLiving target, double amount)
+        public virtual bool HealTarget(GameLiving target, double amount, bool affectedByDisease)
         {
             if (target == null || target.ObjectState is not GameObject.eObjectState.Active)
                 return false;
@@ -61,7 +79,7 @@ namespace DOL.GS.Spells
                 return false;
             }
 
-            if (target.IsDiseased)
+            if (affectedByDisease && target.IsDiseased)
             {
                 MessageToCaster("Your target is diseased!", eChatType.CT_SpellResisted);
                 amount *= 0.5;
@@ -94,7 +112,7 @@ namespace DOL.GS.Spells
             if (Caster is GamePlayer spellCaster && spellCaster.UseDetailedCombatLog && effectiveness != 1)
                 spellCaster.Out.SendMessage($"heal effectiveness: {effectiveness:0.##}", eChatType.CT_DamageAdd, eChatLoc.CL_SystemWindow);
 
-            amount *= 1.0 + RelicMgr.GetRelicBonusModifier(Caster.Realm, eRelicType.Magic);
+            amount *= RelicMgr.GetRelicBonusModifier(Caster, eRelicType.Magic);
             amount *= effectiveness;
 
             /*if (playerTarget != null)
@@ -128,12 +146,12 @@ namespace DOL.GS.Spells
             double preCriticalAmount = amount;
             int criticalChance = Caster.GetModified(eProperty.CriticalHealHitChance);
 
-            if (Util.Chance(criticalChance))
+            if (Caster.Chance(RandomDeckEvent.CriticalChance, criticalChance))
             {
                 double min = 0.1;
                 double max = 1.0;
-                double criticalModifier = min + Util.RandomDoubleIncl() * (max - min);
-                criticalAmount = amount * criticalModifier;
+                double criticalMod = min + Caster.GetPseudoDoubleIncl(RandomDeckEvent.CriticalVariance) * (max - min);
+                criticalAmount = amount * criticalMod;
                 amount += criticalAmount;
             }
 
@@ -145,7 +163,7 @@ namespace DOL.GS.Spells
 
             int effectiveAmount = target.ChangeHealth(Caster, eHealthChangeType.Spell, (int) amount);
 
-            if (effectiveAmount == 0)
+            if (effectiveAmount <= 0)
             {
                 if (Spell.Pulse == 0)
                 {
@@ -194,8 +212,9 @@ namespace DOL.GS.Spells
                         CausesCombat = false
                     };
 
+                    // Reduced aggro generation from heals. Just for balance reasons. May not be live-accurate at all.
                     if (npc.Brain is StandardMobBrain mobBrain)
-                        mobBrain.AddToAggroList(Caster, ad.Damage);
+                        mobBrain.AddToAggroList(Caster, (long) (ad.Damage * 0.5));
 
                     npc.AddXPGainer(Caster, ad.Damage);
                 }
@@ -207,56 +226,31 @@ namespace DOL.GS.Spells
 
         public override void CalculateDamageVariance(GameLiving target, out double min, out double max)
         {
-            double spellValue = m_spell.Value;
-
             if (m_spellLine.KeyName is GlobalSpellsLines.Item_Effects)
             {
-                if (m_spell.Value > 0)
-                {
-                    min = (int) (spellValue * 0.75);
-                    max = (int) (spellValue * 1.25);
-                    return;
-                }
+                min = 0.75;
+                max = 1.25;
+                return;
             }
 
             if (m_spellLine.KeyName is GlobalSpellsLines.Potions_Effects)
             {
-                if (m_spell.Value > 0)
-                {
-                    min = (int) (spellValue * 1.00);
-                    max = (int) (spellValue * 1.25);
-                    return;
-                }
+                min = 1.00;
+                max = 1.25;
+                return;
             }
 
             if (m_spellLine.KeyName is GlobalSpellsLines.Combat_Styles_Effect)
             {
-                if (m_spell.Value > 0)
-                {
-                    min = max = (int) (spellValue * 1.25);
-                    return;
-                }
+                min = max = 1.25;
+                return;
             }
 
             if (m_spellLine.KeyName is GlobalSpellsLines.Reserved_Spells)
             {
-                min = max = (int) spellValue;
+                min = max = 1.0;
                 return;
             }
-
-            if (spellValue < 0)
-            {
-                spellValue = spellValue / -100.0 * m_caster.MaxHealth;
-                min = max = (int) spellValue;
-                return;
-            }
-
-            max = (int) (spellValue * 1.25);
-
-            if (max < 1)
-                max = 1;
-
-            double efficiency;
 
             if (Caster is GamePlayer)
             {
@@ -265,21 +259,20 @@ namespace DOL.GS.Spells
                 if (lineSpec < 1)
                     lineSpec = 1;
 
-                efficiency = 0.25;
+                min = 0.25;
 
                 if (Spell.Level > 0)
                 {
-                    efficiency += (lineSpec - 1.0) / Spell.Level;
+                    min += (lineSpec - 1.0) / Spell.Level;
 
-                    if (efficiency > 1.25)
-                        efficiency = 1.25;
+                    if (min > 1.25)
+                        min = 1.25;
                 }
             }
             else
-                efficiency = 1.25;
+                min = 1.25;
 
-            min = (int) (spellValue * efficiency);
-            min = Math.Clamp(min, 1, max);
+            max = 1.25;
             return;
         }
 

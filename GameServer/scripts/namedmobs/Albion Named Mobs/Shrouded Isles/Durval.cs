@@ -163,13 +163,12 @@ namespace DOL.AI.Brain
 					spell.Radius = 450;
 					spell.Range = 1500;
 					spell.SpellID = 18912;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "Mesmerize";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Spirit;
 					m_Boss_Mezz = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Boss_Mezz);
 				}
 				return m_Boss_Mezz;
 			}
@@ -196,13 +195,12 @@ namespace DOL.AI.Brain
 					spell.Range = 1500;
 					spell.Duration = 120;
 					spell.SpellID = 11911;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "Disease";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Energy; //Energy DMG Type
 					m_DurvalDisease = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_DurvalDisease);
 				}
 				return m_DurvalDisease;
 			}
@@ -225,12 +223,11 @@ namespace DOL.AI.Brain
 					spell.Name = "Shield of Bones";
 					spell.Range = 0;
 					spell.SpellID = 11910;
-					spell.Target = "Self";
+					spell.Target = eSpellTarget.SELF.ToString();
 					spell.Type = eSpellType.Bladeturn.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_Bubble = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Bubble);
 				}
 				return m_Bubble;
 			}
@@ -259,7 +256,6 @@ namespace DOL.AI.Brain
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Spirit;
 					m_Durval_DD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Durval_DD);
 				}
 				return m_Durval_DD;
 			}

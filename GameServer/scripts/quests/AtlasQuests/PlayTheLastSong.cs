@@ -511,14 +511,13 @@ namespace DOL.GS.Quests.Midgard
 					spell.Range = 500;
 					spell.Radius = 500;
 					spell.SpellID = 3618;
-					spell.Target = "Realm";
+					spell.Target = eSpellTarget.REALM.ToString();
 					spell.Type = "HealthRegenBuff";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = 0;
 					spell.Message1 = "Dextz looks calmer.";
 					m_HealthRegen = new Spell(spell, 50);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_HealthRegen);
 				}
 				return m_HealthRegen;
 			}
@@ -567,14 +566,13 @@ namespace DOL.GS.Quests.Midgard
 					spell.Range = 500;
 					spell.Radius = 500;
 					spell.SpellID = 3612;
-					spell.Target = "Realm";
+					spell.Target = eSpellTarget.REALM.ToString();
 					spell.Type = "SpeedEnhancement";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = 0;
 					spell.Message1 = "Thor Boyaux will be protected with Enhancement.";
 					m_SpeedSong = new Spell(spell, 50);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_SpeedSong);
 				}
 				return m_SpeedSong;
 			}
@@ -623,14 +621,13 @@ namespace DOL.GS.Quests.Midgard
 					spell.Range = 500;
 					spell.Radius = 500;
 					spell.SpellID = 3607;
-					spell.Target = "Realm";
+					spell.Target = eSpellTarget.REALM.ToString();
 					spell.Type = "DamageAdd";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = 0;
 					spell.Message1 = "Exiled Vaettir will swing their weapons with zeal.";
 					m_DamageAdd = new Spell(spell, 50);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_DamageAdd);
 				}
 				return m_DamageAdd;
 			}
@@ -676,14 +673,13 @@ namespace DOL.GS.Quests.Midgard
 					spell.Range = 500;
 					spell.Radius = 500;
 					spell.SpellID = 3656;
-					spell.Target = "Realm";
+					spell.Target = eSpellTarget.REALM.ToString();
 					spell.Type = "EnergyResistBuff";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = 0;
 					spell.Message1 = "You are protected from energy!";
 					m_Resistance = new Spell(spell, 50);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Resistance);
 				}
 				return m_Resistance;
 			}

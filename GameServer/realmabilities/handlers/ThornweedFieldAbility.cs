@@ -1,11 +1,5 @@
-using System;
-using System.Collections;
-using System.Reflection;
-using DOL.GS;
-using DOL.GS.PacketHandler;
-using DOL.GS.Effects;
-using DOL.Events;
 using DOL.Database;
+using DOL.GS.PacketHandler;
 
 namespace DOL.GS.RealmAbilities
 {
@@ -30,12 +24,13 @@ namespace DOL.GS.RealmAbilities
 				return;
 			}
 
-			if (caster.GroundTarget == null )
-            {
-                caster.Out.SendMessage( "You must set a ground target to use this ability!", eChatType.CT_System, eChatLoc.CL_SystemWindow );
-                return;
-            }
-            else if(!caster.IsWithinRadius( caster.GroundTarget, 1500 ))
+			if (!caster.GroundTarget.IsValid)
+			{
+				caster.Out.SendMessage("You must set a ground target to use this ability!", eChatType.CT_System, eChatLoc.CL_SystemWindow );
+				return;
+			}
+
+			if (!caster.IsWithinRadius( caster.GroundTarget, 1500))
 			{
 				caster.Out.SendMessage("Your ground target is too far away to use this ability!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
 				return;
@@ -103,7 +98,7 @@ namespace DOL.GS.RealmAbilities
 
 		protected virtual int EndCast(ECSGameTimer timer)
 		{
-			if (m_player.IsMezzed || m_player.IsStunned || m_player.IsSitting)
+			if (m_player.IsCrowdControlled || m_player.IsSitting)
 				return 0;
 			Statics.ThornweedFieldBase twf = new Statics.ThornweedFieldBase(m_dmgValue);
 			twf.CreateStatic(m_player, m_player.GroundTarget, m_duration, 5, 500);

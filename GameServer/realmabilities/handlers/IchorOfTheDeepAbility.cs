@@ -245,7 +245,7 @@ namespace DOL.GS.RealmAbilities
 				return;
 
 			ECSGameEffect mez = EffectListService.GetEffectOnTarget(target, eEffect.Mez);
-			mez?.Stop();
+			mez?.End();
 
 			// Falloff damage
 			int dmgWithFalloff = CalculateDamageWithFalloff(dmgValue, living, target);
@@ -292,7 +292,7 @@ namespace DOL.GS.RealmAbilities
 					//TODO - Refresh existing Ichor duration (or whatever the proper mechanic is?)
 				}
 				else
-					ECSGameEffectFactory.Create(new(target, duration, 1), static (in ECSGameEffectInitParams i) => new AtlasOF_IchorECSEffect(i));
+					ECSGameEffectFactory.Create(new(target, duration, 1), static (in i) => new AtlasOF_IchorECSEffect(i));
 			}
 			else
 				// Send resist animation if they cannot be rooted

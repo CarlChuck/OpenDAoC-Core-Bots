@@ -201,12 +201,11 @@ namespace DOL.AI.Brain
 					spell.Name = "Heat Beam";
 					spell.Range = 1500;
 					spell.SpellID = 11896;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_MFQDD = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_MFQDD);
 				}
 				return m_MFQDD;
 			}

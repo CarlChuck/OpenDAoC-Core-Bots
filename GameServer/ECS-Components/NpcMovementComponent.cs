@@ -21,10 +21,10 @@ namespace DOL.GS
         private long _nextFollowTick;
         private int _followTickInterval;
         private short _moveOnPathSpeed;
-        private long _stopAtWaypointUntil;
+        private long _stopAtPathPointUntil;
         private long _walkingToEstimatedArrivalTime;
         private readonly MovementRequest _movementRequest = new();
-        private readonly PathCalculator _pathCalculator;
+        private readonly Pathfinder _pathfinder;
         private ResetHeadingAction _resetHeadingAction;
         private Vector3 _destinationForClient;
         private long _positionForClientTick;
@@ -38,57 +38,35 @@ namespace DOL.GS
         public ref Vector3 Velocity => ref _velocity;
         public ref Vector3 Destination => ref _destination;
         public GameLiving FollowTarget { get; private set; }
-        public int MinFollowDistance { get; private set; } = 100;
-        public int MaxFollowDistance { get; private set; } = 3000;
+        public int MinFollowDistance { get; private set; }
+        public int MaxFollowDistance { get; private set; }
         public string PathID { get; set; }
-        public PathPoint CurrentWaypoint { get; set; }
+        public PathPoint CurrentPathPoint { get; set; }
         public bool IsReturningToSpawnPoint { get; private set; }
         public int RoamingRange { get; set; }
         public long MovementStartTick { get; set; }
         public long MovementElapsedTicks => IsMoving ? GameLoop.GameLoopTime - MovementStartTick : 0;
         public bool FixedSpeed { get; set; }
         public override short MaxSpeed => FixedSpeed ? MaxSpeedBase : base.MaxSpeed;
-        public bool IsMovingOnPath => IsFlagSet(MovementState.ON_PATH);
+        public bool IsMovingOnPath => IsFlagSet(MovementState.OnPath);
         public bool IsNearSpawn => Owner.IsWithinRadius(Owner.SpawnPoint, 25);
         public bool IsDestinationValid { get; private set; }
         public bool IsAtDestination => !IsDestinationValid || (_destination - _ownerPosition).LengthSquared() < 1.0f;
-        public bool CanRoam => Properties.ALLOW_ROAM && RoamingRange > 0 && string.IsNullOrWhiteSpace(PathID);
+        public bool CanRoam => Properties.ALLOW_ROAM && RoamingRange > 0 && !CanMoveOnPath;
+        public bool CanMoveOnPath => !string.IsNullOrEmpty(PathID);
         public double HorizontalVelocityForClient { get; private set; }
         public bool HasActiveResetHeadingAction => _resetHeadingAction != null && _resetHeadingAction.IsAlive;
         public ref Vector3 DestinationForClient => ref _destinationForClient;
         public ref Vector3 PositionForClient => ref _positionForClientTick == GameLoop.GameLoopTime ? ref _positionForClient : ref _ownerPosition;
 
-        public int X
-        {
-            get
-            {
-                UpdatePosition();
-                return (int) Math.Round(_ownerPosition.X);
-            }
-        }
-
-        public int Y
-        {
-            get
-            {
-                UpdatePosition();
-                return (int) Math.Round(_ownerPosition.Y);
-            }
-        }
-
-        public int Z
-        {
-            get
-            {
-                UpdatePosition();
-                return (int) Math.Round(_ownerPosition.Z);
-            }
-        }
+        public int X => (int) Math.Round(_ownerPosition.X);
+        public int Y => (int) Math.Round(_ownerPosition.Y);
+        public int Z => (int) Math.Round(_ownerPosition.Z);
 
         public NpcMovementComponent(GameNPC owner) : base(owner)
         {
             Owner = owner;
-            _pathCalculator = new(owner);
+            _pathfinder = new(owner);
         }
 
         protected override void TickInternal()
@@ -96,7 +74,7 @@ namespace DOL.GS
             // Update the component's position first for correct calculations.
             UpdatePosition();
 
-            if (IsFlagSet(MovementState.TURN_TO))
+            if (IsFlagSet(MovementState.TurnTo))
             {
                 if (!Owner.IsAttacking)
                 {
@@ -104,18 +82,18 @@ namespace DOL.GS
                     return;
                 }
 
-                UnsetFlag(MovementState.TURN_TO);
+                UnsetFlag(MovementState.TurnTo);
                 _resetHeadingAction.Stop();
                 _resetHeadingAction = null;
             }
 
-            if (IsFlagSet(MovementState.REQUEST))
+            if (IsFlagSet(MovementState.Request))
             {
-                UnsetFlag(MovementState.REQUEST);
+                UnsetFlag(MovementState.Request);
                 ProcessMovementRequest();
             }
 
-            if (IsFlagSet(MovementState.FOLLOW))
+            if (IsFlagSet(MovementState.Follow))
             {
                 if (GameServiceUtils.ShouldTick(_nextFollowTick))
                 {
@@ -124,63 +102,63 @@ namespace DOL.GS
                     if (_followTickInterval != 0)
                         _nextFollowTick = GameLoop.GameLoopTime + _followTickInterval;
                     else
-                        UnsetFlag(MovementState.WALK_TO);
+                        UnsetFlag(MovementState.WalkTo);
                 }
             }
 
-            if (IsFlagSet(MovementState.WALK_TO))
+            if (IsFlagSet(MovementState.WalkTo))
             {
                 if (GameServiceUtils.ShouldTick(_walkingToEstimatedArrivalTime))
                 {
-                    UnsetFlag(MovementState.WALK_TO);
+                    UnsetFlag(MovementState.WalkTo);
                     OnArrival();
                 }
             }
 
-            if (IsFlagSet(MovementState.AT_WAYPOINT))
+            if (IsFlagSet(MovementState.AtPathPoint))
             {
-                if (GameServiceUtils.ShouldTick(_stopAtWaypointUntil))
+                if (GameServiceUtils.ShouldTick(_stopAtPathPointUntil))
                 {
-                    UnsetFlag(MovementState.AT_WAYPOINT);
-                    MoveToNextWaypoint();
+                    UnsetFlag(MovementState.AtPathPoint);
+                    MoveToNextPathPoint();
                 }
             }
 
             FinalizeTick();
+        }
 
-            void FinalizeTick()
+        private void FinalizeTick()
+        {
+            base.TickInternal();
+
+            if (_needsBroadcastUpdate)
             {
-                base.TickInternal();
-
-                if (_needsBroadcastUpdate)
-                {
-                    _needsBroadcastUpdate = false;
-                    OnPositionUpdate();
-                    ClientService.UpdateNpcForPlayers(Owner);
-                }
-
-                if (_movementState is MovementState.NONE)
-                    RemoveFromServiceObjectStore();
+                _needsBroadcastUpdate = false;
+                OnPositionUpdate();
+                ClientService.UpdateNpcForPlayers(Owner);
             }
+
+            if (_movementState is MovementState.None)
+                RemoveFromServiceObjectStore();
         }
 
         public void WalkTo(Vector3 destination, short speed)
         {
             _movementRequest.Set(MovementRequestType.Walk, destination, speed);
-            SetFlag(MovementState.REQUEST);
+            SetFlag(MovementState.Request);
             AddToServiceObjectStore();
         }
 
         public void PathTo(Vector3 destination, short speed)
         {
             _movementRequest.Set(MovementRequestType.Path, destination, speed);
-            SetFlag(MovementState.REQUEST);
+            SetFlag(MovementState.Request);
             AddToServiceObjectStore();
         }
 
         public void StopMoving()
         {
-            _movementState = MovementState.NONE;
+            _movementState = MovementState.None;
             StopFollowing();
             StopMovingOnPath();
             CancelReturnToSpawnPoint();
@@ -200,13 +178,13 @@ namespace DOL.GS
             FollowTarget = target;
             MinFollowDistance = minDistance;
             MaxFollowDistance = maxDistance;
-            SetFlag(MovementState.FOLLOW);
+            SetFlag(MovementState.Follow);
             AddToServiceObjectStore();
         }
 
         public void StopFollowing()
         {
-            UnsetFlag(MovementState.FOLLOW);
+            UnsetFlag(MovementState.Follow);
             FollowTarget = null;
         }
 
@@ -215,9 +193,9 @@ namespace DOL.GS
             StopMoving();
             _moveOnPathSpeed = speed;
 
-            // Move to the first waypoint if we don't have any.
-            // Otherwise and if we're not currently moving on path, move to the previous one (current waypoint if none).
-            if (CurrentWaypoint == null)
+            // Move to the first path point if we don't have any.
+            // Otherwise and if we're not currently moving on path, move to the previous one (current path point if none).
+            if (CurrentPathPoint == null)
             {
                 if (PathID == null)
                 {
@@ -227,9 +205,9 @@ namespace DOL.GS
                     return;
                 }
 
-                CurrentWaypoint = MovementMgr.LoadPath(PathID);
+                CurrentPathPoint = MovementMgr.LoadPath(PathID);
 
-                if (CurrentWaypoint == null)
+                if (CurrentPathPoint == null)
                 {
                     if (log.IsErrorEnabled)
                         log.Error($"Called {nameof(MoveOnPath)} but LoadPath returned null (PathID: {PathID}) (NPC: {Owner})");
@@ -237,44 +215,45 @@ namespace DOL.GS
                     return;
                 }
 
-                SetFlag(MovementState.ON_PATH);
-                PathTo(new(CurrentWaypoint.X, CurrentWaypoint.Y, CurrentWaypoint.Z), Math.Min(_moveOnPathSpeed, CurrentWaypoint.MaxSpeed));
+                SetFlag(MovementState.OnPath);
+                PathTo(new(CurrentPathPoint.X, CurrentPathPoint.Y, CurrentPathPoint.Z), Math.Min(_moveOnPathSpeed, CurrentPathPoint.MaxSpeed));
                 return;
             }
-            else if (!IsFlagSet(MovementState.ON_PATH))
+            else if (!IsFlagSet(MovementState.OnPath))
             {
-                SetFlag(MovementState.ON_PATH);
+                SetFlag(MovementState.OnPath);
 
-                if (Owner.IsWithinRadius(CurrentWaypoint, 25))
+                if (Owner.IsWithinRadius(CurrentPathPoint, 25))
                 {
-                    MoveToNextWaypoint();
+                    MoveToNextPathPoint();
                     return;
                 }
 
-                if (CurrentWaypoint.Type == EPathType.Path_Reverse && CurrentWaypoint.FiredFlag)
+                if (CurrentPathPoint.Type == EPathType.Path_Reverse && CurrentPathPoint.FiredFlag)
                 {
-                    if (CurrentWaypoint.Next != null)
-                        CurrentWaypoint = CurrentWaypoint.Next;
+                    if (CurrentPathPoint.Next != null)
+                        CurrentPathPoint = CurrentPathPoint.Next;
                 }
-                else if (CurrentWaypoint.Prev != null)
-                    CurrentWaypoint = CurrentWaypoint.Prev;
+                else if (CurrentPathPoint.Prev != null)
+                    CurrentPathPoint = CurrentPathPoint.Prev;
 
-                PathTo(new(CurrentWaypoint.X, CurrentWaypoint.Y, CurrentWaypoint.Z), Owner.MaxSpeed);
+                PathTo(new(CurrentPathPoint.X, CurrentPathPoint.Y, CurrentPathPoint.Z), Owner.MaxSpeed);
             }
             else if (log.IsErrorEnabled)
-                log.Error($"Called {nameof(MoveOnPath)} but both CurrentWaypoint and ON_PATH are already set. (NPC: {Owner})");
+                log.Error($"Called {nameof(MoveOnPath)} but both {nameof(CurrentPathPoint)} and {nameof(MovementState.OnPath)} are already set. (NPC: {Owner})");
         }
 
         public void StopMovingOnPath()
         {
-            // Without this, horses would be immediately removed since 'MoveOnPath' immediately calls 'StopMoving', which calls 'StopMovingOnPath'.
-            if (IsFlagSet(MovementState.ON_PATH))
-            {
-                if (Owner is GameTaxi or GameTaxiBoat)
-                    Owner.RemoveFromWorld();
+            if (!IsFlagSet(MovementState.OnPath))
+                return;
 
-                UnsetFlag(MovementState.ON_PATH);
-            }
+            UnsetFlag(MovementState.OnPath);
+
+            if (Owner is GameTaxi or GameTaxiBoat)
+                Owner.RemoveFromWorld();
+
+            // We don't reset CurrentPathPoint here to allow the path to be resumed. This must be done manually if needed (on NPC death for example).
         }
 
         public void ReturnToSpawnPoint()
@@ -299,12 +278,16 @@ namespace DOL.GS
 
         public void Roam(short speed)
         {
-            // Note that `CanRoam` returns false if `RoamingRange` is <= 0.
-            int maxRoamingRadius = Owner.RoamingRange > 0 ? Owner.RoamingRange : Owner.CurrentRegion.IsDungeon ? 5 : 500;
+            // `CanRoam` returns false if `RoamingRange` is <= 0.
+            if (!CanRoam)
+                return;
 
-            if (Owner.CurrentZone.IsPathingEnabled)
+            int maxRoamingRadius = Owner.RoamingRange;
+
+            if (Owner.CurrentZone.IsPathfindingEnabled)
             {
-                Vector3? target = PathingMgr.Instance.GetRandomPoint(Owner.CurrentZone, new(Owner.SpawnPoint.X, Owner.SpawnPoint.Y, Owner.SpawnPoint.Z), maxRoamingRadius);
+                EDtPolyFlags[] filters = PathfindingProvider.Instance.DefaultFilters;
+                Vector3? target = PathfindingProvider.Instance.GetRandomPoint(Owner.CurrentZone, new(Owner.SpawnPoint.X, Owner.SpawnPoint.Y, Owner.SpawnPoint.Z), maxRoamingRadius, filters);
 
                 if (target.HasValue)
                     PathTo(target.Value, speed);
@@ -316,7 +299,7 @@ namespace DOL.GS
             double angle = Util.RandomDouble() * Math.PI * 2;
             double targetX = Owner.SpawnPoint.X + maxRoamingRadius * Math.Cos(angle);
             double targetY = Owner.SpawnPoint.Y + maxRoamingRadius * Math.Sin(angle);
-            WalkTo(new Vector3((float) targetX, (float) targetY, Owner.SpawnPoint.Z), speed);
+            WalkTo(new((float) targetX, (float) targetY, Owner.SpawnPoint.Z), speed);
         }
 
         public void RestartCurrentMovement()
@@ -340,12 +323,12 @@ namespace DOL.GS
 
         public void TurnTo(ushort heading, int duration = 0)
         {
-            if (Owner.Heading == heading || Owner.IsStunned || Owner.IsMezzed || IsTurningDisabled)
+            if (Owner.Heading == heading || Owner.IsCrowdControlled || IsTurningDisabled)
                 return;
 
             if (duration > 0)
             {
-                SetFlag(MovementState.TURN_TO);
+                SetFlag(MovementState.TurnTo);
 
                 if (_resetHeadingAction == null)
                 {
@@ -381,9 +364,9 @@ namespace DOL.GS
 
         public void TogglePathVisualization()
         {
-            // Toggle both visualization for `PathCalculator` (pathfinding) and `PathPoint` (patrols, horse routes).
+            // Toggle visualization for both `Pathfinder` (pathfinding) and `PathPoint` (patrols, horse routes).
 
-            _pathCalculator.ToggleVisualization();
+            _pathfinder.ToggleVisualization();
 
             if (_pathVisualization != null)
             {
@@ -394,15 +377,16 @@ namespace DOL.GS
 
             _pathVisualization = new();
 
-            if (CurrentWaypoint != null)
-                _pathVisualization.Visualize(MovementMgr.FindFirstPathPoint(CurrentWaypoint), Owner.CurrentRegion);
+            if (CurrentPathPoint != null)
+                _pathVisualization.Visualize(MovementMgr.FindFirstPathPoint(CurrentPathPoint), Owner.CurrentRegion);
         }
 
         public void ForceUpdatePosition()
         {
-            _lastPositionUpdateTick = -1;
-            UpdatePosition();
+            // Must be called every time the NPC is teleported or moved by other means than this component.
+            _ownerPosition = new(Owner.RealX, Owner.RealY, Owner.RealZ);
             _positionForClient = _ownerPosition;
+            _lastPositionUpdateTick = GameLoop.GameLoopTime;
         }
 
         protected override void UpdatePosition()
@@ -410,19 +394,15 @@ namespace DOL.GS
             if (_lastPositionUpdateTick == GameLoop.GameLoopTime)
                 return;
 
-            Vector3 startPosition = new(Owner.RealX, Owner.RealY, Owner.RealZ);
-
-            // We still update _ownerPosition if the NPC isn't moving in case it's not moving by itself (teleports, GM tool...)
-            // This also ensures _ownerPosition always has a value.
             if (!IsMoving)
             {
-                _ownerPosition = startPosition;
                 _lastPositionUpdateTick = GameLoop.GameLoopTime;
                 return;
             }
 
-            Vector3 movementDelta = _velocity * (MovementElapsedTicks * 0.001f);
-            Vector3 potentialPosition = startPosition + movementDelta;
+            long timeDelta = GameLoop.GameLoopTime - _lastPositionUpdateTick;
+            Vector3 movementDelta = _velocity * (timeDelta * 0.001f);
+            Vector3 potentialPosition = _ownerPosition + movementDelta;
 
             if (!IsDestinationValid)
             {
@@ -431,7 +411,7 @@ namespace DOL.GS
                 return;
             }
 
-            Vector3 absToDestination = Vector3.Abs(_destination - startPosition);
+            Vector3 absToDestination = Vector3.Abs(_destination - _ownerPosition);
             Vector3 absMovementDelta = Vector3.Abs(movementDelta);
 
             // Create a "mask" vector (1.0f or 0.0f) for each axis.
@@ -459,7 +439,7 @@ namespace DOL.GS
         {
             MovementStartTick = GameLoop.GameLoopTime;
 
-            if (!IsMoving || distanceToTarget < 1)
+            if (!IsMoving || distanceToTarget <= 0)
             {
                 _velocity = Vector3.Zero;
                 HorizontalVelocityForClient = 0.0;
@@ -473,8 +453,7 @@ namespace DOL.GS
             }
             else
             {
-                Vector3 ownerRealPos = new(Owner.RealX, Owner.RealY, Owner.RealZ);
-                Vector3 direction = _destination - ownerRealPos;
+                Vector3 direction = _destination - _ownerPosition;
                 float scale = CurrentSpeed / distanceToTarget;
                 _velocity = direction * scale;
             }
@@ -501,75 +480,160 @@ namespace DOL.GS
                 return;
             }
 
-            float distanceToTarget = Owner.GetDistanceTo(destination);
+            float distanceToTarget = (_ownerPosition - destination).Length();
+
+            if (distanceToTarget > 25)
+                TurnTo((int) destination.X, (int) destination.Y);
+            else if (!IsFlagSet(MovementState.Pathfinding))
+                TurnTo(FollowTarget);
+
             int ticksToArrive = (int) (distanceToTarget * 1000 / speed);
 
             if (ticksToArrive <= 0)
             {
+                _ownerPosition = destination;
+
                 if (CurrentSpeed > 0)
                     UpdateMovement(0);
 
                 return;
             }
 
-            if (distanceToTarget > 25)
-                TurnTo((int) destination.X, (int) destination.Y);
-
             // Assume either the destination or speed has changed.
             UpdateMovement(destination, distanceToTarget, speed);
-            SetFlag(MovementState.WALK_TO);
+            SetFlag(MovementState.WalkTo);
             _walkingToEstimatedArrivalTime = GameLoop.GameLoopTime + ticksToArrive;
         }
 
         private void PathToInternal(Vector3 destination, short speed)
         {
-            if (_pathCalculator == null)
+            Zone zone = Owner.CurrentZone;
+
+            if (!_pathfinder.ShouldPath(zone, destination))
             {
-                UnsetFlag(MovementState.PATHING);
-                WalkToInternal(destination, speed);
+                FallbackToWalk(this, destination, speed);
                 return;
             }
 
-            if (!PathCalculator.ShouldPath(Owner, destination))
+            if (_pathfinder.TryGetNextNode(zone, _ownerPosition, destination, out Vector3? _nextNode))
             {
-                UnsetFlag(MovementState.PATHING);
-                WalkToInternal(destination, speed);
+                // Continue to the next node, even on partial paths.
+                _movementRequest.Set(MovementRequestType.Path, destination, speed);
+                SetFlag(MovementState.Pathfinding);
+                WalkToInternal(_nextNode.Value, speed);
                 return;
             }
 
-            Vector3? nextNode = _pathCalculator.CalculateNextTarget(destination, out ENoPathReason noPathReason);
-
-            // Fall back to normal walking method if no path is found.
-            if (noPathReason is ENoPathReason.NoPath or ENoPathReason.End)
+            switch (_pathfinder.PathfindingStatus)
             {
-                UnsetFlag(MovementState.PATHING);
-                WalkToInternal(destination, speed);
-                return;
+                case PathfindingStatus.PathFound:
+                {
+                    EDtPolyFlags[] filters = PathfindingProvider.Instance.BlockingDoorAvoidanceFilters;
+
+                    // Finalize the path if we have direct LoS to the destination.
+                    // This ensures that the NPC stays on the mesh, assuming it's on it to begin with.
+                    // Use the most restrictive filters for now, since we don't know which ones were used.
+                    if (PathfindingProvider.Instance.HasLineOfSight(zone, _ownerPosition, destination, filters))
+                        FallbackToWalk(this, destination, speed);
+                    else
+                        PauseMovement(this, destination);
+
+                    break;
+                }
+                case PathfindingStatus.PartialPathFound:
+                case PathfindingStatus.BufferTooSmall:
+                case PathfindingStatus.NoPathFound: // Happens when either the current position or the destination isn't on a mesh.
+                {
+                    // Non-pet NPCs are teleported to the closest reachable node from a reverse-path.
+                    // The teleport can cover a large distance in some cases, for example when both the NPC and the player are on a mesh island.
+                    // This helps against exploits and misplaced NPCs.
+
+                    // Pets following their owner are teleported at their feet if both are out of combat.
+                    // This allows them to keep up if they jump down a ledge or bridge.
+                    // This can theoretically be exploited by players in combat, but it requires both the pet and the owner to leave combat.
+
+                    if (Owner.Brain is not ControlledMobBrain petBrain)
+                    {
+                        if (JumpToClosestReachableNode(this, destination))
+                            break;
+                    }
+                    else if (!Owner.InCombat && !petBrain.Owner.InCombat && FollowTarget != null && petBrain.Owner == FollowTarget)
+                    {
+                        if (TeleportPetToFloorBeneathOwner(this, petBrain))
+                            break;
+                    }
+
+                    PauseMovement(this, destination);
+                    break;
+                }
+                case PathfindingStatus.NotSet:
+                case PathfindingStatus.NavmeshUnavailable:
+                {
+                    FallbackToWalk(this, destination, speed);
+                    break;
+                }
+                default:
+                {
+                    PauseMovement(this, destination);
+                    break;
+                }
             }
 
-            // Pause movement and turn toward the destination the path contains a closed door.
-            if (noPathReason is ENoPathReason.ClosedDoor)
+            static void FallbackToWalk(NpcMovementComponent component, Vector3 destination, short speed)
             {
-                TurnTo((int) destination.X, (int) destination.Y);
-                UnsetFlag(MovementState.PATHING);
-
-                if (IsMoving)
-                    UpdateMovement(0);
-
-                return;
+                component.UnsetFlag(MovementState.Pathfinding);
+                component.WalkToInternal(destination, speed);
             }
 
-            // Walk towards the next pathing node.
-            _movementRequest.Set(MovementRequestType.Path, destination, speed);
-            SetFlag(MovementState.PATHING);
-            WalkToInternal(nextNode.Value, speed);
-            return;
+            static bool JumpToClosestReachableNode(NpcMovementComponent component, Vector3 destination)
+            {
+                if (!component._pathfinder.TryGetClosestReachableNode(component.Owner.CurrentZone, destination, component._ownerPosition, out Vector3? node) || !node.HasValue)
+                    return false;
+
+                component._ownerPosition = node.Value;
+                component.UpdateMovement(0);
+                component._pathfinder.ForceReplot = true;
+                return true;
+            }
+
+            static bool TeleportPetToFloorBeneathOwner(NpcMovementComponent component, ControlledMobBrain petBrain)
+            {
+                const int MAX_TELEPORT_TRIGGER_RANGE = 1024;
+                const int MAX_FLOOR_SEARCH_DEPTH = 1024;
+                const int MIN_TELEPORT_DISTANCE = 128;
+
+                GamePlayer playerOwner = petBrain.GetPlayerOwner();
+
+                if (!component.Owner.IsWithinRadius(playerOwner, MAX_TELEPORT_TRIGGER_RANGE))
+                    return false;
+
+                Vector3 playerOwnerPos = new(playerOwner.X, playerOwner.Y, playerOwner.Z);
+                EDtPolyFlags[] filters = PathfindingProvider.Instance.DefaultFilters;
+                Vector3? floor = PathfindingProvider.Instance.GetFloorBeneath(playerOwner.CurrentZone, playerOwnerPos, MAX_FLOOR_SEARCH_DEPTH, filters);
+
+                if (!floor.HasValue || component.Owner.IsWithinRadius(floor.Value, MIN_TELEPORT_DISTANCE))
+                    return false;
+
+                component._ownerPosition = floor.Value;
+                component.UpdateMovement(0);
+                component._pathfinder.ForceReplot = true;
+                return true;
+            }
+
+            static void PauseMovement(NpcMovementComponent component, Vector3 destination)
+            {
+                component.TurnTo((int) destination.X, (int) destination.Y);
+                component.UnsetFlag(MovementState.Pathfinding);
+
+                if (component.IsMoving)
+                    component.UpdateMovement(0);
+            }
         }
 
         private int FollowTick()
         {
             // Stop moving if the NPC is casting or using ranged weapons.
-            if (Owner.IsCasting || (Owner.IsAttacking && Owner.ActiveWeaponSlot == eActiveWeaponSlot.Distance))
+            if (Owner.IsCasting || (Owner.IsAttacking && Owner.ActiveWeaponSlot is eActiveWeaponSlot.Distance))
             {
                 StopMoving();
                 return Properties.GAMENPC_FOLLOWCHECK_TIME;
@@ -582,151 +646,157 @@ namespace DOL.GS
             }
 
             Vector3 targetPos = new(FollowTarget.X, FollowTarget.Y, FollowTarget.Z);
-            bool isInFormation = false;
 
             if (Owner.Brain is StandardMobBrain brain && FollowTarget.Realm == Owner.Realm)
             {
-                int tx = (int) targetPos.X, ty = (int) targetPos.Y, tz = (int) targetPos.Z;
+                int tx = (int) targetPos.X;
+                int ty = (int) targetPos.Y;
+                int tz = (int) targetPos.Z;
 
                 // Update to formation-adjusted position.
                 if (brain.CheckFormation(ref tx, ref ty, ref tz))
                 {
-                    isInFormation = true;
                     targetPos = new(tx, ty, tz);
+                    MinFollowDistance = 0;
                 }
             }
 
             Vector3 relative = targetPos - _ownerPosition;
             float distanceSquared = relative.LengthSquared();
-            long maxFollowDistanceSquared = MaxFollowDistance * MaxFollowDistance;
 
-            if (distanceSquared > maxFollowDistanceSquared)
+            if (distanceSquared > MaxFollowDistance * MaxFollowDistance)
             {
-                ReturnToSpawnPoint();
+                StopFollowing();
                 return 0;
             }
 
-            if (!isInFormation && distanceSquared <= MinFollowDistance * MinFollowDistance)
+            // The way position is updated ensures that we never move past the destination, so we need to take potential small inaccuracies into account.
+            if (distanceSquared <= (MinFollowDistance + 1) * (MinFollowDistance + 1))
             {
                 TurnTo(FollowTarget);
 
                 if (IsMoving)
                     UpdateMovement(0);
 
+                UnsetFlag(MovementState.Pathfinding); // Ensures OnArrival doesn't try to reach remaining nodes.
                 return Properties.GAMENPC_FOLLOWCHECK_TIME;
             }
 
             float distance = MathF.Sqrt(distanceSquared);
+            float scale = MinFollowDistance / distance;
 
-            Vector3 direction = Vector3.Normalize(relative);
-            Vector3 offset = direction * MinFollowDistance;
-            Vector3 destination = targetPos - offset;
+            Vector3 destination = targetPos - relative * scale;
+            destination.Z = targetPos.Z; // May move the NPC closer than intended, but improves movement overall.
 
-            int interval;
             short speed;
 
+            // No smoothing if the NPC is attacking and is out of melee range.
             if (Owner.IsAttacking && distance > Owner.MeleeAttackRange)
-            {
-                // No smoothing if the NPC is attacking and is out of melee range.
                 speed = MaxSpeed;
-                interval = 100;
-            }
             else
+                speed = (short) Math.Min(MaxSpeed, (distance - MinFollowDistance) * 2.5);
+
+            // Snap the destination to the mesh with a generous search distance. Use the follow target's position as a fallback.
+            if (!TrySnapToMesh(ref destination))
             {
-                // Reduce follow distance slightly for speed calculation for even smoother movement.
-                speed = (short) Math.Min(MaxSpeed, (distance - MinFollowDistance - 10) * 2);
-                interval = Properties.GAMENPC_FOLLOWCHECK_TIME;
+                destination = targetPos;
+                TrySnapToMesh(ref destination);
             }
 
-            PathToInternal(destination, Math.Min(MaxSpeed, speed));
-            return interval;
+            PathToInternal(destination, Math.Max((short) 20, speed));
+            return Properties.GAMENPC_FOLLOWCHECK_TIME;
+        }
+
+        public bool TrySnapToMesh(ref Vector3 destination)
+        {
+            const float MAX_SNAP_DISTANCE = 128f;
+            Zone zone = Owner.CurrentRegion.GetZone((int) destination.X, (int) destination.Y);
+            return PathfindingProvider.Instance.TrySnapToMesh(zone, ref destination, MAX_SNAP_DISTANCE);
         }
 
         private void OnArrival()
         {
-            if (IsFlagSet(MovementState.PATHING))
+            if (IsFlagSet(MovementState.Pathfinding))
             {
                 ProcessMovementRequest();
-                return;
+
+                if (IsFlagSet(MovementState.WalkTo))
+                    return;
             }
 
-            if (IsFlagSet(MovementState.FOLLOW))
+            if (IsFlagSet(MovementState.Follow))
                 return;
 
             if (IsReturningToSpawnPoint)
             {
-                SetPositionToDestination();
+                _ownerPosition = _destination;
+                UpdateMovement(0);
                 CancelReturnToSpawnPoint();
                 TurnTo(Owner.SpawnHeading);
                 return;
             }
 
-            if (IsFlagSet(MovementState.ON_PATH))
+            if (IsFlagSet(MovementState.OnPath))
             {
-                if (CurrentWaypoint != null)
+                if (CurrentPathPoint != null)
                 {
-                    if (CurrentWaypoint.WaitTime == 0)
+                    if (CurrentPathPoint.WaitTime == 0)
                     {
-                        MoveToNextWaypoint();
+                        MoveToNextPathPoint();
                         return;
                     }
 
-                    SetFlag(MovementState.AT_WAYPOINT);
-                    _stopAtWaypointUntil = GameLoop.GameLoopTime + CurrentWaypoint.WaitTime * 100;
+                    SetFlag(MovementState.AtPathPoint);
+                    _stopAtPathPointUntil = GameLoop.GameLoopTime + CurrentPathPoint.WaitTime * 100;
                 }
                 else
                     StopMovingOnPath();
             }
 
             if (IsMoving)
-                SetPositionToDestination();
-
-            void SetPositionToDestination()
             {
-                Owner.X = (int) _destination.X;
-                Owner.Y = (int) _destination.Y;
-                Owner.Z = (int) _destination.Z;
+                _ownerPosition = _destination;
                 UpdateMovement(0);
             }
         }
 
-        private void MoveToNextWaypoint()
+        private void MoveToNextPathPoint()
         {
-            PathPoint oldPathPoint = CurrentWaypoint;
-            PathPoint nextPathPoint = CurrentWaypoint.Next;
+            PathPoint oldPathPoint = CurrentPathPoint;
+            PathPoint nextPathPoint = CurrentPathPoint.Next;
 
-            if ((CurrentWaypoint.Type is EPathType.Path_Reverse) && CurrentWaypoint.FiredFlag)
-                nextPathPoint = CurrentWaypoint.Prev;
+            if ((CurrentPathPoint.Type is EPathType.Path_Reverse) && CurrentPathPoint.FiredFlag)
+                nextPathPoint = CurrentPathPoint.Prev;
 
             if (nextPathPoint == null)
             {
-                switch (CurrentWaypoint.Type)
+                switch (CurrentPathPoint.Type)
                 {
                     case EPathType.Loop:
                     {
-                        CurrentWaypoint = MovementMgr.FindFirstPathPoint(CurrentWaypoint);
+                        CurrentPathPoint = MovementMgr.FindFirstPathPoint(CurrentPathPoint);
                         break;
                     }
                     case EPathType.Once:
                     {
-                        CurrentWaypoint = null;
+                        CurrentPathPoint = null;
                         PathID = null; // Unset the path ID, otherwise the brain will re-enter patrolling state and restart it.
                         break;
                     }
                     case EPathType.Path_Reverse:
                     {
-                        CurrentWaypoint = oldPathPoint.FiredFlag ? CurrentWaypoint.Next : CurrentWaypoint.Prev;
+                        CurrentPathPoint = oldPathPoint.FiredFlag ? CurrentPathPoint.Next : CurrentPathPoint.Prev;
                         break;
                     }
                 }
             }
             else
-                CurrentWaypoint = CurrentWaypoint.Type is EPathType.Path_Reverse && CurrentWaypoint.FiredFlag ? CurrentWaypoint.Prev : CurrentWaypoint.Next;
+                CurrentPathPoint = CurrentPathPoint.Type is EPathType.Path_Reverse && CurrentPathPoint.FiredFlag ? CurrentPathPoint.Prev : CurrentPathPoint.Next;
 
             oldPathPoint.FiredFlag = !oldPathPoint.FiredFlag;
 
-            if (CurrentWaypoint != null)
-                PathTo(new(CurrentWaypoint.X, CurrentWaypoint.Y, CurrentWaypoint.Z), Math.Min(_moveOnPathSpeed, CurrentWaypoint.MaxSpeed));
+            if (CurrentPathPoint != null)
+                PathTo(new(CurrentPathPoint.X, CurrentPathPoint.Y, CurrentPathPoint.Z), Math.Min(_moveOnPathSpeed, CurrentPathPoint.MaxSpeed));
             else
                 StopMovingOnPath();
         }
@@ -745,31 +815,29 @@ namespace DOL.GS
                 return;
             }
 
+            float magic;
+            float ratio;
+
             if (wasMoving)
                 _positionForClient = _ownerPosition;
             else
             {
-                float magic = (float) (CurrentSpeed * 0.15);
-                float ratio = (float) ((distanceToTarget + magic) / distanceToTarget);
+                magic = (float) (CurrentSpeed * 0.15);
+                ratio = (float) ((distanceToTarget + magic) / distanceToTarget);
                 _positionForClient = Vector3.Lerp(_destination, _ownerPosition, ratio);
             }
 
-            if (distanceToTarget < 1)
-                _destinationForClient = _ownerPosition;
-            else
-            {
-                float magic = (float) Math.Max(15, CurrentSpeed * 0.1);
-                float ratio = (float) ((distanceToTarget + magic) / distanceToTarget);
-                _destinationForClient = Vector3.Lerp(_ownerPosition, _destination, ratio);
-            }
+            magic = (float) Math.Max(15, CurrentSpeed * 0.1);
+            ratio = (float) ((distanceToTarget + magic) / distanceToTarget);
+            _destinationForClient = Vector3.Lerp(_ownerPosition, _destination, ratio);
         }
 
         private void UpdateMovement(short speed)
         {
             // Save current position.
-            Owner.X = Owner.X;
-            Owner.Y = Owner.Y;
-            Owner.Z = Owner.Z;
+            Owner.X = (int) Math.Round(_ownerPosition.X);
+            Owner.Y = (int) Math.Round(_ownerPosition.Y);
+            Owner.Z = (int) Math.Round(_ownerPosition.Z);
 
             _needsBroadcastUpdate = true;
             IsDestinationValid = false;
@@ -782,11 +850,11 @@ namespace DOL.GS
         private void UpdateMovement(Vector3 destination, float distanceToTarget, short speed)
         {
             // Save current position.
-            Owner.X = Owner.X;
-            Owner.Y = Owner.Y;
-            Owner.Z = Owner.Z;
+            Owner.X = (int) Math.Round(_ownerPosition.X);
+            Owner.Y = (int) Math.Round(_ownerPosition.Y);
+            Owner.Z = (int) Math.Round(_ownerPosition.Z);
 
-            IsDestinationValid = distanceToTarget >= 1;
+            IsDestinationValid = distanceToTarget >= 0;
             _destination = destination;
             _needsBroadcastUpdate = true;
 
@@ -800,7 +868,7 @@ namespace DOL.GS
         {
             return new(Owner, this, () =>
             {
-                UnsetFlag(MovementState.TURN_TO);
+                UnsetFlag(MovementState.TurnTo);
                 _resetHeadingAction = null;
             });
         }
@@ -878,14 +946,14 @@ namespace DOL.GS
         [Flags]
         private enum MovementState
         {
-            NONE = 0,
-            REQUEST = 1 << 1,      // Was requested to move.
-            WALK_TO = 1 << 2,      // Is moving and has a destination.
-            FOLLOW = 1 << 3,       // Is following an object.
-            ON_PATH = 1 << 4,      // Is following a path / is patrolling.
-            AT_WAYPOINT = 1 << 5,  // Is waiting at a waypoint.
-            PATHING = 1 << 6,      // Is moving using PathCalculator.
-            TURN_TO = 1 << 7       // Is facing a direction for a certain duration.
+            None = 0,
+            Request = 1 << 1,     // Was requested to move.
+            WalkTo = 1 << 2,      // Is moving and has a destination.
+            Follow = 1 << 3,      // Is following an object.
+            OnPath = 1 << 4,      // Is following a path / is patrolling.
+            AtPathPoint = 1 << 5, // Is waiting at a path point.
+            Pathfinding = 1 << 6, // Is moving using Pathfinder.
+            TurnTo = 1 << 7       // Is facing a direction for a certain duration.
         }
     }
 }

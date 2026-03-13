@@ -184,14 +184,13 @@ namespace DOL.AI.Brain
 					spell.Duration = 20;
 					spell.Frequency = 40;
 					spell.SpellID = 11805;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.SpellGroup = 1800;
 					spell.EffectGroup = 1500;
 					spell.Type = eSpellType.DamageOverTime.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Matter;
 					m_Droom_Dot = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Droom_Dot);
 				}
 				return m_Droom_Dot;
 			}
@@ -221,14 +220,13 @@ namespace DOL.AI.Brain
 					spell.Duration = 20;
 					spell.Frequency = 40;
 					spell.SpellID = 11806;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.SpellGroup = 1801;
 					spell.EffectGroup = 1501;
 					spell.Type = eSpellType.DamageOverTime.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Body;
 					m_Droom_Dot2 = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Droom_Dot2);
 				}
 				return m_Droom_Dot2;
 			}
@@ -253,12 +251,11 @@ namespace DOL.AI.Brain
 					spell.Value = 80;
 					spell.Radius = 450;
 					spell.SpellID = 11807;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.StrengthConstitutionDebuff.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_Droom_SC_Debuff = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Droom_SC_Debuff);
 				}
 				return m_Droom_SC_Debuff;
 			}
@@ -283,12 +280,11 @@ namespace DOL.AI.Brain
 					spell.Value = 38;
 					spell.Radius = 450;
 					spell.SpellID = 11808;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.CombatSpeedDebuff.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_Droom_Haste_Debuff = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Droom_Haste_Debuff);
 				}
 				return m_Droom_Haste_Debuff;
 			}
@@ -315,13 +311,12 @@ namespace DOL.AI.Brain
 					spell.Range = 350;
 					spell.Duration = 120;
 					spell.SpellID = 11809;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "Disease";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Energy; //Energy DMG Type
 					m_DroomDisease = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_DroomDisease);
 				}
 				return m_DroomDisease;
 			}

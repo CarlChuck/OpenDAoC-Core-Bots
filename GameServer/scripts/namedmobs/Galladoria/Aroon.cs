@@ -575,13 +575,12 @@ namespace DOL.AI.Brain
                     spell.Radius = 1200;
                     spell.Range = 1500;
                     spell.SpellID = 117230;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "SpeedDecrease";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int) eDamageType.Matter;
                     m_AroonRoot = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_AroonRoot);
                 }
 
                 return m_AroonRoot;

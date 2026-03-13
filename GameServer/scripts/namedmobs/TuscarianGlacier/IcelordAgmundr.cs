@@ -220,13 +220,12 @@ namespace DOL.AI.Brain
                 spell.Range = 1500;
                 spell.Radius = 500;
                 spell.SpellID = 11744;
-                spell.Target = "Enemy";
+                spell.Target = eSpellTarget.ENEMY.ToString();
                 spell.Type = "DirectDamageNoVariance";
                 spell.Uninterruptible = true;
                 spell.MoveCast = true;
                 spell.DamageType = (int) eDamageType.Cold;
                 m_AgmundrDD = new Spell(spell, 70);
-                SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_AgmundrDD);
                 return m_AgmundrDD;
             }
         }

@@ -96,10 +96,9 @@ namespace DOL.GS
 					spell.Name = "Marfoirwort Life-leech";
 					spell.Range = 500;
 					spell.SpellID = 11905;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					m_MarfoirwortDD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_MarfoirwortDD);
 				}
 				return m_MarfoirwortDD;
 			}

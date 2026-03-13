@@ -248,12 +248,11 @@ namespace DOL.GS
                     spell.Range = 0;
                     spell.Radius = 350;
                     spell.SpellID = 11755;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = eSpellType.DirectDamageNoVariance.ToString();
                     spell.Radius = 500;
                     spell.EffectGroup = 0;
                     m_HeatDDSpell = new Spell(spell, 50);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_HeatDDSpell);
                 }
                 return m_HeatDDSpell;
             }
@@ -638,12 +637,11 @@ namespace DOL.AI.Brain
                     spell.Name = "Heal";
                     spell.Range = 1500;
                     spell.SpellID = 11889;
-                    spell.Target = "Self";
+                    spell.Target = eSpellTarget.SELF.ToString();
                     spell.Type = "Heal";
                     m_GreenKnightHeal = new Spell(spell, 70);
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_GreenKnightHeal);
                 }
                 return m_GreenKnightHeal;
             }

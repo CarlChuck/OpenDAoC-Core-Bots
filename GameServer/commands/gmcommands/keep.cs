@@ -74,7 +74,7 @@ namespace DOL.GS.Commands
 			}
 
 			AbstractGameKeep myKeep = client.Player.TempProperties.GetProperty<AbstractGameKeep>(TEMP_KEEP_LAST);
-			if (myKeep == null) myKeep = GameServer.KeepManager.GetKeepCloseToSpot(client.Player.CurrentRegionID, client.Player, 10000);
+			if (myKeep == null) myKeep = GameServer.KeepManager.GetClosestKeepToSpot(client.Player.CurrentRegionID, client.Player, 10000);
 			
 			switch (args[1])
 			{
@@ -111,7 +111,7 @@ namespace DOL.GS.Commands
 							return;
 						}
 
-						if ((keepID >> 8) != 0 || GameServer.KeepManager.Keeps[keepID] != null)
+						if ((keepID >> 8) != 0 || GameServer.KeepManager.GetKeepByID(keepID) != null)
 						{
 							DisplayMessage(client, "KeepID must be unused and less than 256.");
 							return;
@@ -2451,6 +2451,7 @@ namespace DOL.GS.Commands
 							banner.Y = client.Player.Y;
 							banner.Z = client.Player.Z;
 							banner.Heading = client.Player.Heading;
+							banner.LoadedFromScript = false;
 							banner.SaveIntoDatabase();
 
 							foreach (AbstractArea area in banner.CurrentAreas)

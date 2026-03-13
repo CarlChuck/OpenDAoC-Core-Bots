@@ -43,9 +43,9 @@ namespace DOL.AI.Brain
                     continue;
 
                 if (Properties.CHECK_LOS_BEFORE_AGGRO_FNF)
-                    SendLosCheckForAggro(player, player);
+                    SendAggroLosCheck(player, player);
                 else
-                    AddToAggroList(player, 1);
+                    AddToAggroList(player);
             }
         }
 
@@ -64,17 +64,17 @@ namespace DOL.AI.Brain
                 {
                     if (npc.Brain is ControlledMobBrain theirControlledNpcBrain && theirControlledNpcBrain.GetPlayerOwner() is GamePlayer theirOwner)
                     {
-                        SendLosCheckForAggro(theirOwner, npc);
+                        SendAggroLosCheck(theirOwner, npc);
                         continue;
                     }
                     else if (GetPlayerOwner() is GamePlayer ourOwner)
                     {
-                        SendLosCheckForAggro(ourOwner, npc);
+                        SendAggroLosCheck(ourOwner, npc);
                         continue;
                     }
                 }
 
-                AddToAggroList(npc, 1);
+                AddToAggroList(npc);
             }
         }
 

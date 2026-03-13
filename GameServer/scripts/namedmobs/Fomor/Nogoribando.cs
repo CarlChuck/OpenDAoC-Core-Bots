@@ -184,7 +184,6 @@ namespace DOL.AI.Brain
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_Boss_SC_Debuff = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Boss_SC_Debuff);
 				}
 				return m_Boss_SC_Debuff;
 			}
@@ -210,12 +209,11 @@ namespace DOL.AI.Brain
 					spell.Range = 0;
 					spell.Value = 50;
 					spell.SpellID = 11838;
-					spell.Target = "Self";
+					spell.Target = eSpellTarget.SELF.ToString();
 					spell.Type = eSpellType.CombatSpeedBuff.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_Boss_Haste_Buff = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Boss_Haste_Buff);
 				}
 				return m_Boss_Haste_Buff;
 			}

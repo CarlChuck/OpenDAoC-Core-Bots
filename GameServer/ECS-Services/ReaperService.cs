@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using DOL.Logging;
+using DOL.Timing;
 using ECS.Debug;
 
 namespace DOL.GS
@@ -50,9 +51,9 @@ namespace DOL.GS
                 if (Diagnostics.CheckServiceObjectCount)
                     Interlocked.Increment(ref Instance.EntityCount);
 
-                long startTick = GameLoop.GetRealTime();
+                long startTick = MonotonicTime.NowMs;
                 livingBeingKilled.Killed.ProcessDeath(livingBeingKilled.Killer);
-                long stopTick = GameLoop.GetRealTime();
+                long stopTick = MonotonicTime.NowMs;
 
                 if (stopTick - startTick > Diagnostics.LongTickThreshold)
                     log.Warn($"Long {Instance.ServiceName}.{nameof(Tick)} for {livingBeingKilled} Time: {stopTick - startTick}ms");
@@ -64,7 +65,10 @@ namespace DOL.GS
             finally
             {
                 if (livingBeingKilled != null)
+                {
                     ServiceObjectStore.Remove(livingBeingKilled);
+                    livingBeingKilled.Killed.OnReaperServiceHandlingComplete();
+                }
             }
         }
 
@@ -79,12 +83,11 @@ namespace DOL.GS
     {
         public GameLiving Killed { get; private set; }
         public GameObject Killer { get; private set; }
-        public ServiceObjectId ServiceObjectId { get; set; }
+        public ServiceObjectId ServiceObjectId { get; } = new(ServiceObjectType.LivingBeingKilled);
 
         private LivingBeingKilled(GameLiving killed, GameObject killer)
         {
             Initialize(killed, killer);
-            ServiceObjectId = new ServiceObjectId(ServiceObjectType.LivingBeingKilled);
         }
 
         public static void Create(GameLiving killed, GameObject killer)

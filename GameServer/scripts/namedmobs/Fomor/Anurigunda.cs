@@ -223,13 +223,12 @@ namespace DOL.AI.Brain
 					spell.Range = 0;
 					spell.Radius = 350;
 					spell.SpellID = 11839;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DamageOverTime.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Heat;
 					m_FireGroundDD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_FireGroundDD);
 				}
 				return m_FireGroundDD;
 			}

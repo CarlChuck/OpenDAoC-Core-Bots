@@ -220,12 +220,11 @@ namespace DOL.AI.Brain
 					spell.Damage = 0;
 					spell.DamageType = (int)eDamageType.Cold;
 					spell.SpellID = 18920;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.Nearsight.ToString();
 					spell.Message1 = "You are blinded!";
 					spell.Message2 = "{0} is blinded!";
 					m_NearsightMistressSpell = new Spell(spell, 50);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_NearsightMistressSpell);
 				}
 				return m_NearsightMistressSpell;
 			}
@@ -252,12 +251,11 @@ namespace DOL.AI.Brain
 					spell.Radius = 450;
 					spell.SpellID = 18921;
 					spell.RecastDelay = 0;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.MoveCast = false;
 					spell.DamageType = (int)eDamageType.Energy; //Energy DMG Type
 					m_AoESpell = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_AoESpell);
 				}
 				return m_AoESpell;
 			}

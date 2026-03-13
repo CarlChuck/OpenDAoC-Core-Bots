@@ -18,6 +18,7 @@ using DOL.GS.Quests;
 using DOL.GS.ServerProperties;
 using DOL.GS.Styles;
 using DOL.Language;
+using DOL.Logging;
 
 namespace DOL.GS
 {
@@ -27,7 +28,7 @@ namespace DOL.GS
 	/// </summary>
 	public class GameNPC : GameLiving, ITranslatableObject, IPooledList<GameNPC>
 	{
-		public static readonly Logging.Logger log = Logging.LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
+		public static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
 		private static ConcurrentDictionary<Type, Func<AbstractQuest>> _abstractQuestConstructorCache = new();
 
 		private const int VISIBLE_TO_PLAYER_SPAN = 60000;
@@ -670,22 +671,14 @@ namespace DOL.GS
 			}
 		}
 
-
-		public override bool IsUnderwater
-		{
-			get { return (m_flags & eFlags.SWIMMING) == eFlags.SWIMMING || base.IsUnderwater; }
-		}
-
+		public override bool IsUnderwater => (m_flags & eFlags.SWIMMING) is eFlags.SWIMMING || base.IsUnderwater;
 
 		/// <summary>
 		/// Shows wether any player sees that mob
 		/// we dont need to calculate things like AI if mob is in no way
 		/// visible to at least one player
 		/// </summary>
-		public virtual bool IsVisibleToPlayers
-		{
-			get { return GameLoop.GameLoopTime - m_lastVisibleToPlayerTick < VISIBLE_TO_PLAYER_SPAN; }
-		}
+		public virtual bool IsVisibleToPlayers => GameLoop.GameLoopTime - m_lastVisibleToPlayerTick < VISIBLE_TO_PLAYER_SPAN;
 
 		/// <summary>
 		/// Gets or sets the spawnposition of this npc
@@ -807,10 +800,10 @@ namespace DOL.GS
 			get => movementComponent.PathID;
 			set => movementComponent.PathID = value;
 		}
-		public PathPoint CurrentWaypoint
+		public PathPoint CurrentPathPoint
 		{
-			get => movementComponent.CurrentWaypoint;
-			set => movementComponent.CurrentWaypoint = value;
+			get => movementComponent.CurrentPathPoint;
+			set => movementComponent.CurrentPathPoint = value;
 		}
 		public bool IsReturningToSpawnPoint => movementComponent.IsReturningToSpawnPoint;
 		public int RoamingRange
@@ -823,6 +816,7 @@ namespace DOL.GS
 		public bool IsDestinationValid => movementComponent.IsDestinationValid;
 		public bool IsAtDestination => movementComponent.IsAtDestination;
 		public bool CanRoam => movementComponent.CanRoam;
+		public bool CanMoveOnPath => movementComponent.CanMoveOnPath;
 
 		public void WalkTo(Point3D target, short speed)
 		{
@@ -1954,6 +1948,8 @@ namespace DOL.GS
 		/// <returns>true if the npc has been successfully added</returns>
 		public override bool AddToWorld()
 		{
+			movementComponent.ForceUpdatePosition();
+
 			if (!base.AddToWorld())
 				return false;
 
@@ -2018,7 +2014,6 @@ namespace DOL.GS
 			if (IsStealthed)
 				WasStealthed = true;
 
-			movementComponent.ForceUpdatePosition(); // Ensure a correct initial state. Movement component can't do it itself.
 			ClientService.CreateObjectForPlayers(this);
 			return true;
 		}
@@ -2060,41 +2055,20 @@ namespace DOL.GS
 			return true;
 		}
 
-		/// <summary>
-		/// Move an NPC within the same region without removing from world
-		/// </summary>
-		/// <param name="regionID"></param>
-		/// <param name="x"></param>
-		/// <param name="y"></param>
-		/// <param name="z"></param>
-		/// <param name="heading"></param>
-		/// <param name="forceMove">Move regardless of combat check</param>
-		/// <returns>true if npc was moved</returns>
 		public virtual bool MoveInRegion(ushort regionID, int x, int y, int z, ushort heading, bool forceMove)
 		{
-			if (m_ObjectState != eObjectState.Active)
+			if (m_ObjectState is not eObjectState.Active || regionID != CurrentRegionID)
 				return false;
 
-			if (regionID != CurrentRegionID)
+			if (!forceMove && InCombat)
 				return false;
 
-			if (forceMove == false)
-			{
-				if (InCombat)
-					return false;
+			Region region = WorldMgr.GetRegion(regionID);
 
-				// Only move pet if it's following the owner.
-				if (Brain is ControlledMobBrain controlledBrain && controlledBrain.WalkState != eWalkState.Follow)
-					return false;
-			}
-
-			Region rgn = WorldMgr.GetRegion(regionID);
-
-			if (rgn == null || rgn.GetZone(x, y) == null)
+			if (region == null || region.GetZone(x, y) == null)
 				return false;
 
 			Notify(GameObjectEvent.MoveTo, this, new MoveToEventArgs(regionID, x, y, z, heading));
-
 			List<GamePlayer> playersInRadius = GetPlayersInRadius(WorldMgr.VISIBILITY_DISTANCE);
 
 			m_x = x;
@@ -2109,6 +2083,20 @@ namespace DOL.GS
 			// New position.
 			movementComponent.ForceUpdatePosition();
 			ClientService.CreateObjectForPlayers(this);
+
+			// Handle sub pets.
+			if (ControlledNpcList == null)
+				return true;
+
+			foreach (IControlledBrain controlledBrain in ControlledNpcList)
+			{
+				if (controlledBrain != null && controlledBrain.Body != null)
+				{
+					GameNPC subPet = controlledBrain.Body;
+					subPet.MoveInRegion(CurrentRegionID, m_x, m_y, m_z, Heading, true);
+				}
+			}
+
 			return true;
 		}
 
@@ -2126,8 +2114,6 @@ namespace DOL.GS
 				}
 			}
 
-			Brain.Stop();
-			StopFollowing();
 			TempProperties.RemoveProperty(CHARMED_TICK_PROP);
 			base.Delete();
 		}
@@ -2667,6 +2653,8 @@ namespace DOL.GS
 
 		#region Combat
 
+		public override bool BenefitsFromRelics => Brain is ControlledMobBrain brain && brain.GetPlayerOwner() != null;
+
 		/// <summary>
 		/// The property that holds charmed tick if any
 		/// </summary>
@@ -2731,11 +2719,10 @@ namespace DOL.GS
 		}
 
 		private double damageFactor = 1;
-		private int orbsReward = 0;
 
 		public override double GetWeaponSkill(DbInventoryItem weapon)
 		{
-			double weaponSkill = Math.Max(1, (int) Level) * 2.6 * (1 + 0.01 * (GetWeaponStat(weapon) + 30) / 2);
+			double weaponSkill = Math.Max(1, (int) Level) * 2.5 * (1 + 0.01 * (GetWeaponStat(weapon) + 30) / 2);
 			return Math.Max(1, weaponSkill * GetModified(eProperty.WeaponSkill) * 0.01);
 		}
 
@@ -2773,8 +2760,28 @@ namespace DOL.GS
 		/// <summary>
 		/// Tests if this MOB should give XP and loot based on the XPGainers
 		/// </summary>
-		/// <returns>true if it should deal XP and give loot</returns>
-		public virtual bool IsWorthReward => Brain is not IControlledBrain && CurrentRegion.Time - CHARMED_NOEXP_TIMEOUT >= TempProperties.GetProperty<long>(CHARMED_TICK_PROP);
+		public virtual RewardEligibility RewardStatus
+		{
+			get
+			{
+				if (Brain is IControlledBrain)
+					return RewardEligibility.DeniedInvalid;
+
+				long charmedTick = TempProperties.GetProperty<long>(CHARMED_TICK_PROP);
+
+				if (charmedTick != 0 && CurrentRegion.Time < charmedTick + CHARMED_NOEXP_TIMEOUT)
+					return RewardEligibility.DeniedRecentlyCharmed;
+
+				return RewardEligibility.Eligible;
+			}
+		}
+
+		public enum RewardEligibility
+		{
+			Eligible,
+			DeniedInvalid,
+			DeniedRecentlyCharmed
+		}
 
 		protected void ControlledNPC_Release()
 		{
@@ -2786,47 +2793,40 @@ namespace DOL.GS
 		/// </summary>
 		public override void ProcessDeath(GameObject killer)
 		{
-			try
+			Brain?.KillFSM();
+			FireAmbientSentence(eAmbientTrigger.dying, killer);
+
+			if (ControlledBrain != null)
+				ControlledNPC_Release();
+
+			StopMoving();
+			CurrentPathPoint = null;
+
+			if (killer is GameNPC pet && pet.Brain is IControlledBrain petBrain)
+				killer = petBrain.GetPlayerOwner();
+
+			if (killer != null)
 			{
-				Brain?.KillFSM();
-				FireAmbientSentence(eAmbientTrigger.dying, killer);
+				Message.SystemToArea(this, $"{GetName(0, true)} dies!", eChatType.CT_PlayerDied, killer);
 
-				if (ControlledBrain != null)
-					ControlledNPC_Release();
+				if (killer is GamePlayer player)
+					player.Out.SendMessage($"{GetName(0, true)} dies!", eChatType.CT_PlayerDied, eChatLoc.CL_SystemWindow);
 
-				StopMoving();
-
-				if (killer is GameNPC pet && pet.Brain is IControlledBrain petBrain)
-					killer = petBrain.GetPlayerOwner();
-
-				if (killer != null)
-				{
-					Message.SystemToArea(this, $"{GetName(0, true)} dies!", eChatType.CT_PlayerDied, killer);
-
-					if (killer is GamePlayer player)
-						player.Out.SendMessage($"{GetName(0, true)} dies!", eChatType.CT_PlayerDied, eChatLoc.CL_SystemWindow);
-
-					// Deal out experience, realm points, loot... Based on server rules.
-					GameServer.ServerRules.OnNpcKilled(this, killer);
-				}
-
-				Group?.RemoveMember(this);
-				base.ProcessDeath(killer);
-
-				lock (XpGainersLock)
-				{
-					XPGainers.Clear();
-				}
-
-				Delete();
-				TempProperties.RemoveAllProperties();
-				StartRespawn();
+				// Deal out experience, realm points, loot... Based on server rules.
+				GameServer.ServerRules.OnNpcKilled(this, killer);
 			}
-			finally
+
+			Group?.RemoveMember(this);
+			base.ProcessDeath(killer);
+
+			lock (XpGainersLock)
 			{
-				if (IsBeingHandledByReaperService)
-					base.ProcessDeath(killer);
+				XPGainers.Clear();
 			}
+
+			Delete();
+			TempProperties.RemoveAllProperties();
+			StartRespawn();
 		}
 
 		/// <summary>
@@ -2904,17 +2904,6 @@ namespace DOL.GS
 		{
 			get { return m_leftHandSwingChance; }
 			set { m_leftHandSwingChance = value; }
-		}
-
-		/// <summary>
-		/// Calculates how many times left hand swings
-		/// </summary>
-		/// <returns></returns>
-		public int CalculateLeftHandSwingCount()
-		{
-			if (Util.Chance(m_leftHandSwingChance))
-				return 1;
-			return 0;
 		}
 
 		/// <summary>
@@ -3039,16 +3028,7 @@ namespace DOL.GS
 		/// </summary>
 		public virtual void StartRespawn()
 		{
-			if (IsAlive)
-				return;
-
-			if (m_healthRegenerationTimer != null)
-			{
-				m_healthRegenerationTimer.Stop();
-				m_healthRegenerationTimer = null;
-			}
-
-			if (RespawnInterval <= 0)
+			if (IsAlive || RespawnInterval <= 0)
 				return;
 
 			lock (_respawnTimerLock)
@@ -3127,59 +3107,6 @@ namespace DOL.GS
 		}
 
 		public virtual bool CanDropLoot => true;
-
-		/// <summary>
-		/// The enemy is healed, so we add to the xp gainers list
-		/// </summary>
-		/// <param name="enemy"></param>
-		/// <param name="healSource"></param>
-		/// <param name="changeType"></param>
-		/// <param name="healAmount"></param>
-		public override void EnemyHealed(GameLiving enemy, GameObject healSource, eHealthChangeType changeType, int healAmount)
-		{
-			base.EnemyHealed(enemy, healSource, changeType, healAmount);
-
-			if (changeType != eHealthChangeType.Spell)
-				return;
-			if (enemy == healSource)
-				return;
-			if (!IsAlive)
-				return;
-
-			GameLiving healSourceLiving = healSource as GameLiving;
-
-			if (healSourceLiving == null)
-				return;
-
-			Group attackerGroup = healSourceLiving.Group;
-			if (attackerGroup != null)
-			{
-				// collect "helping" group players in range
-				var xpGainers = attackerGroup.GetMembersInTheGroup()
-					.Where(l => this.IsWithinRadius(l, WorldMgr.MAX_EXPFORKILL_DISTANCE) && l.IsAlive && l.ObjectState == eObjectState.Active).ToArray();
-
-				float damageAmount = (float)healAmount / xpGainers.Length;
-
-				foreach (GameLiving living in xpGainers)
-				{
-					// add players in range for exp to exp gainers
-					this.AddXPGainer(living, damageAmount);
-				}
-			}
-			else
-			{
-				this.AddXPGainer(healSourceLiving, healAmount);
-			}
-
-			if (healSource is GamePlayer || (healSource is GameNPC healSourceNpc && (healSourceNpc.Flags & eFlags.PEACE) == 0))
-			{
-				// first check to see if the healer is in our aggrolist so we don't go attacking anyone who heals
-				if (Brain is StandardMobBrain mobBrain && mobBrain.GetBaseAggroAmount(healSourceLiving) > 0)
-					mobBrain.AddToAggroList(healSourceLiving, healAmount);
-			}
-
-			//DealDamage needs to be called after addxpgainer!
-		}
 
 		public override long LastAttackTickPvE
 		{
@@ -3360,15 +3287,20 @@ namespace DOL.GS
 			}
 		}
 
-		public virtual void ScaleSpell(Spell spell, int casterLevel, double baseLineLevel)
+		public Spell GetScaledSpell(Spell spell)
 		{
-			if (spell == null || Level < 1 || spell.ScaledToNpcLevel)
-				return;
+			spell.IsDynamic = true; // We don't know if another NPC will scale it. We have to assume that it will happen.
 
-			if (casterLevel < 1)
-				casterLevel = Level;
+			if (spell == null || Level < 1)
+				return spell;
 
-			double scalingFactor = casterLevel / baseLineLevel;
+			double scalingFactor = GetSpellScalingFactor();
+
+			if (scalingFactor == 1.0)
+				return spell;
+
+			// Always copy the spell. We don't want to modify the real one.
+			spell = spell.Copy();
 
 			switch (spell.SpellType)
 			{
@@ -3381,8 +3313,7 @@ namespace DOL.GS
 				case eSpellType.DamageSpeedDecrease:
 				case eSpellType.StyleBleeding:
 				{
-					spell.Damage *= scalingFactor;
-					spell.ScaledToNpcLevel = true;
+					spell.Damage = Math.Round(spell.Damage * scalingFactor, 2);
 					break;
 				}
 				// Scale Value.
@@ -3419,8 +3350,7 @@ namespace DOL.GS
 				case eSpellType.SpeedDecrease:
 				case eSpellType.SavageCombatSpeedBuff:
 				{
-					spell.Value *= scalingFactor;
-					spell.ScaledToNpcLevel = true;
+					spell.Value = Math.Round(spell.Value * scalingFactor, 2);
 					break;
 				}
 				// Scale Duration.
@@ -3432,7 +3362,6 @@ namespace DOL.GS
 				case eSpellType.StyleSpeedDecrease:
 				{
 					spell.Duration = (int) Math.Ceiling(spell.Duration * scalingFactor);
-					spell.ScaledToNpcLevel = true;
 					break;
 				}
 				// Scale Damage and Value.
@@ -3443,19 +3372,30 @@ namespace DOL.GS
 					// For pet level 1-23, the debuff is now 10%.
 					// For pet level 24-43, the debuff is now 20%.
 					// For pet level 44-50, the debuff is now 30%.
-					spell.Value *= scalingFactor;
-					spell.Damage *= scalingFactor;
+					spell.Value = Math.Round(spell.Value * scalingFactor, 2);
+					spell.Damage = Math.Round(spell.Damage * scalingFactor, 2);
 					spell.Duration = (int) Math.Ceiling(spell.Duration * scalingFactor);
-					spell.ScaledToNpcLevel = true;
 					break;
 				}
 				case eSpellType.StyleTaunt:
 				case eSpellType.CurePoison:
 				case eSpellType.CureDisease:
-					break;
+					return spell;
 				default:
-					break;
+				{
+					if (log.IsWarnEnabled)
+						log.Warn($"Unhandled spell in {nameof(GetScaledSpell)}: {spell}");
+
+					return spell;
+				}
 			}
+
+			return spell;
+		}
+
+		public virtual double GetSpellScalingFactor()
+		{
+			return Level / 50.0;
 		}
 
 		/// <summary>
@@ -3463,44 +3403,7 @@ namespace DOL.GS
 		/// </summary>
 		public virtual bool CastSpell(Spell spell, SpellLine line, bool checkLos)
 		{
-			bool casted;
-
-			// Don't check for LoS if the spell has no range.
-			if (checkLos && spell.Range > 0)
-				casted = CastSpell(spell, line);
-			else
-			{
-				Spell spellToCast;
-
-				if (line.KeyName == GlobalSpellsLines.Mob_Spells)
-				{
-					// NPC spells will get the level equal to their caster
-					spellToCast = (Spell)spell.Clone();
-					spellToCast.Level = Level;
-				}
-				else
-					spellToCast = spell;
-
-				casted = base.CastSpell(spellToCast, line);
-			}
-
-			return casted;
-		}
-
-		public override bool CastSpell(Spell spell, SpellLine line, ISpellCastingAbilityHandler spellCastingAbilityHandler = null)
-		{
-			Spell spellToCast;
-
-			if (line.KeyName is GlobalSpellsLines.Mob_Spells)
-			{
-				// NPC spells will get the level equal to their caster
-				spellToCast = (Spell) spell.Clone();
-				spellToCast.Level = Level;
-			}
-			else
-				spellToCast = spell;
-
-			return base.CastSpell(spellToCast, line, spellCastingAbilityHandler);
+			return base.CastSpell(spell, line, null, checkLos);
 		}
 
 		public virtual void OnCastSpellLosCheckFail(GameObject target)

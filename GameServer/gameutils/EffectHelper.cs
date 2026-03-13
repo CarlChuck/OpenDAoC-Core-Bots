@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using DOL.Database;
 using DOL.GS.Spells;
+using DOL.Logging;
 
 namespace DOL.GS
 {
     public static class EffectHelper
     {
-        private static readonly Logging.Logger log = Logging.LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
 
         public static int GetConcentrationEffectActivationRange(eSpellType spellType)
         {
@@ -18,21 +18,21 @@ namespace DOL.GS
 
         public static void SendSpellAnimation(ECSGameSpellEffect e)
         {
-            if (e != null)
-            {
-                ISpellHandler spellHandler = e.SpellHandler;
-                Spell spell = spellHandler.Spell;
-                GameLiving target;
+            if (e == null)
+                return;
 
-                // Focus damage shield. Need to figure out why this is needed.
-                if (spell.IsPulsing && spell.SpellType == eSpellType.DamageShield)
-                    target = spellHandler.Target;
-                else
-                    target = e.Owner;
+            ISpellHandler spellHandler = e.SpellHandler;
+            Spell spell = spellHandler.Spell;
+            GameLiving target;
 
-                foreach (GamePlayer player in e.Owner.GetPlayersInRadius(WorldMgr.VISIBILITY_DISTANCE))
-                    player.Out.SendSpellEffectAnimation(spellHandler.Caster, target, spell.ClientEffect, 0, false, 1);
-            }
+            // Focus damage shield. Need to figure out why this is needed.
+            if (spell.IsPulsing && spell.SpellType == eSpellType.DamageShield)
+                target = spellHandler.Target;
+            else
+                target = e.Owner;
+
+            foreach (GamePlayer player in e.Owner.GetPlayersInRadius(WorldMgr.VISIBILITY_DISTANCE))
+                player.Out.SendSpellEffectAnimation(spellHandler.Caster, target, spell.ClientEffect, 0, false, 1);
         }
 
         public static eEffect GetEffectFromSpell(Spell spell)
@@ -79,7 +79,7 @@ namespace DOL.GS
                 case eSpellType.AcuityBuff:
                     return eEffect.AcuityBuff;
                 case eSpellType.ArmorAbsorptionBuff:
-                    return eEffect.ArmorAbsorptionBuff;
+                    return eEffect.PhysicalAbsorptionBuff; // Every ABS buff are applied as secondary ABS buff and don't modify armor ABS.
                 case eSpellType.BaseArmorFactorBuff:
                     return eEffect.BaseAFBuff;
                 case eSpellType.SpecArmorFactorBuff:
@@ -139,6 +139,7 @@ namespace DOL.GS
                 case eSpellType.StyleSpeedDecrease:
                 case eSpellType.SpeedDecrease:
                 case eSpellType.UnbreakableSpeedDecrease:
+                case eSpellType.PreventFlight:
                     return eEffect.MovementSpeedDebuff;
                 case eSpellType.MeleeDamageDebuff:
                     return eEffect.MeleeDamageDebuff;
@@ -162,10 +163,6 @@ namespace DOL.GS
                     return eEffect.MesmerizeDurationBuff;
                 //case eSpellType.MezImmunity:
                 //    return eEffect.MezImmunity;
-                //case eSpellType.StyleSpeedDecrease:
-                //    return eEffect.MeleeSnare;
-                //case eSpellType.Snare: // May work off of SpeedDecrease.
-                //    return eEffect.Snare;
                 //case eSpellType.SnareImmunity: // Not implemented.
                 //    return eEffect.SnareImmunity;
                 case eSpellType.Nearsight:
@@ -214,7 +211,9 @@ namespace DOL.GS
                 case eSpellType.SavageDPSBuff:
                 case eSpellType.SavageEnduranceHeal:
                 case eSpellType.SavageEvadeBuff:
+                case eSpellType.SavageStyleEvadeBuff:
                 case eSpellType.SavageParryBuff:
+                case eSpellType.SavageStyleParryBuff:
                 case eSpellType.SavageSlashResistanceBuff:
                 case eSpellType.SavageThrustResistanceBuff:
                     return eEffect.SavageBuff;
@@ -275,8 +274,7 @@ namespace DOL.GS
                 case eSpellType.Stun:
                     return eEffect.StunImmunity;
                 case eSpellType.SpeedDecrease:
-                case eSpellType.DamageSpeedDecreaseNoVariance:
-                case eSpellType.DamageSpeedDecrease:
+                case eSpellType.UnbreakableSpeedDecrease:
                     return eEffect.SnareImmunity;
                 case eSpellType.Nearsight:
                     return eEffect.NearsightImmunity;
@@ -350,9 +348,11 @@ namespace DOL.GS
                 case eEffect.ArmorFactorDebuff:
                     list.Add(eProperty.ArmorFactor);
                     return list;
-                case eEffect.ArmorAbsorptionBuff:
                 case eEffect.ArmorAbsorptionDebuff:
                     list.Add(eProperty.ArmorAbsorption);
+                    return list;
+                case eEffect.PhysicalAbsorptionBuff:
+                    list.Add(eProperty.PhysicalAbsorption);
                     return list;
                 case eEffect.MeleeDamageBuff:
                 case eEffect.MeleeDamageDebuff:
@@ -453,7 +453,7 @@ namespace DOL.GS
         public static PlayerUpdate GetPlayerUpdateFromEffect(eEffect effect)
         {
             // Doesn't set PlayerUpdate.CONCENTRATION.
-            PlayerUpdate playerUpdate = PlayerUpdate.ICONS;
+            PlayerUpdate playerUpdate = PlayerUpdate.Icons;
 
             switch (effect)
             {
@@ -461,24 +461,24 @@ namespace DOL.GS
                 case eEffect.StrengthDebuff:
                 case eEffect.Disease:
                 {
-                    playerUpdate |= PlayerUpdate.STATS;
-                    playerUpdate |= PlayerUpdate.ENCUMBERANCE;
+                    playerUpdate |= PlayerUpdate.Stats;
+                    playerUpdate |= PlayerUpdate.Encumbrance;
                     break;
                 }
                 case eEffect.StrengthConBuff:
                 case eEffect.StrConDebuff:
                 {
-                    playerUpdate |= PlayerUpdate.STATUS;
-                    playerUpdate |= PlayerUpdate.STATS;
-                    playerUpdate |= PlayerUpdate.ENCUMBERANCE;
+                    playerUpdate |= PlayerUpdate.Status;
+                    playerUpdate |= PlayerUpdate.Stats;
+                    playerUpdate |= PlayerUpdate.Encumbrance;
                     break;
                 }
                 case eEffect.ConstitutionBuff:
                 case eEffect.ConstitutionDebuff:
                 case eEffect.WsConDebuff:
                 {
-                    playerUpdate |= PlayerUpdate.STATUS;
-                    playerUpdate |= PlayerUpdate.STATS;
+                    playerUpdate |= PlayerUpdate.Status;
+                    playerUpdate |= PlayerUpdate.Stats;
                     break;
                 }
                 case eEffect.DexterityBuff:
@@ -490,7 +490,7 @@ namespace DOL.GS
                 case eEffect.AcuityBuff:
                 case eEffect.AcuityDebuff:
                 {
-                    playerUpdate |= PlayerUpdate.STATS;
+                    playerUpdate |= PlayerUpdate.Stats;
                     break;
                 }
                 case eEffect.BodyResistBuff:
@@ -517,7 +517,7 @@ namespace DOL.GS
                 case eEffect.AllMeleeResistsBuff:
                 case eEffect.AllMeleeResistsDebuff:
                 {
-                    playerUpdate |= PlayerUpdate.RESISTS;
+                    playerUpdate |= PlayerUpdate.Resists;
                     break;
                 }
                 case eEffect.BaseAFBuff:
@@ -525,7 +525,7 @@ namespace DOL.GS
                 case eEffect.PaladinAf:
                 case eEffect.ArmorFactorDebuff:
                 {
-                    playerUpdate |= PlayerUpdate.WEAPON_ARMOR;
+                    playerUpdate |= PlayerUpdate.WeaponArmor;
                     break;
                 }
             }
@@ -533,102 +533,72 @@ namespace DOL.GS
             return playerUpdate;
         }
 
-        public static void RestoreAllEffects(GamePlayer p)
+        public static void RestoreAllEffects(GamePlayer player)
         {
-            GamePlayer player = p;
+            IList<DbPlayerXEffect> savedEffects = DOLDB<DbPlayerXEffect>.SelectObjects(DB.Column("ChardID").IsEqualTo(player.ObjectId));
 
-            if (player == null || player.DBCharacter == null || GameServer.Database == null)
+            if (savedEffects == null)
                 return;
 
-            IList<DbPlayerXEffect> effs = DOLDB<DbPlayerXEffect>.SelectObjects(DB.Column("ChardID").IsEqualTo(player.ObjectId));
-            if (effs == null)
-                return;
+            GameServer.Database.DeleteObject(savedEffects);
 
-            foreach (DbPlayerXEffect eff in effs)
-                GameServer.Database.DeleteObject(eff);
-
-            foreach (DbPlayerXEffect eff in effs.GroupBy(e => e.Var1).Select(e => e.First()))
+            foreach (DbPlayerXEffect savedEffect in savedEffects)
             {
-                if (eff.SpellLine == GlobalSpellsLines.Reserved_Spells)
-                    continue;
-
-                bool good = true;
-                Spell spell = SkillBase.GetSpellByID(eff.Var1);
+                Spell spell = SkillBase.GetSpellByID(savedEffect.Var1);
 
                 if (spell == null)
-                    good = false;
+                    continue;
 
-                SpellLine line = null;
+                SpellLine line = SkillBase.GetSpellLine(savedEffect.SpellLine, false);
 
-                if (!string.IsNullOrEmpty(eff.SpellLine))
-                {
-                    line = SkillBase.GetSpellLine(eff.SpellLine, false);
+                if (line == null)
+                    continue;
 
-                    if (line == null)
-                        good = false;
-                }
-                else
-                    good = false;
-
-                if (good)
-                {
-                    ISpellHandler handler = ScriptMgr.CreateSpellHandler(player, spell, line);
-                    handler.Spell.Duration = eff.Duration;
-                    handler.Spell.CastTime = 1;
-                    handler.StartSpell(player);
-                    player.Out.SendStatusUpdate();
-                }
+                ISpellHandler handler = ScriptMgr.CreateSpellHandler(player, spell, line);
+                handler.Spell.Duration = savedEffect.Duration;
+                handler.StartSpell(player);
+                player.Out.SendStatusUpdate();
             }
         }
 
         public static void SaveAllEffects(GamePlayer player)
         {
-            IList<DbPlayerXEffect> effs = DOLDB<DbPlayerXEffect>.SelectObjects(DB.Column("ChardID").IsEqualTo(player.ObjectId));
-            if (effs != null)
-                GameServer.Database.DeleteObject(effs);
-
-            foreach (ECSGameEffect eff in player.effectListComponent.GetEffects())
+            foreach (ECSGameSpellEffect effect in player.effectListComponent.GetSpellEffects())
             {
                 try
                 {
-                    if (eff is ECSGameSpellEffect gse)
-                    {
-                        // No concentration Effect from other casters.
-                        if (gse.SpellHandler?.Spell?.Concentration > 0 && gse.SpellHandler.Caster != player)
-                            continue;
-                    }
-
-                    DbPlayerXEffect effect = eff.GetSavedEffect();
-
-                    if (effect == null)
+                    // Don't save effects from other players, as we won't be able to restore them correctly (different caster, dynamically scaled spell...)
+                    if (effect.SpellHandler.Caster != player)
                         continue;
 
-                    if (effect.SpellLine == GlobalSpellsLines.Reserved_Spells)
+                    DbPlayerXEffect savedEffect = effect.GetSavedEffect();
+
+                    if (savedEffect == null)
                         continue;
 
-                    effect.ChardID = player.ObjectId;
-
-                    GameServer.Database.AddObject(effect);
+                    savedEffect.ChardID = player.ObjectId;
+                    GameServer.Database.AddObject(savedEffect);
                 }
                 catch (Exception e)
                 {
-                    if (log.IsWarnEnabled)
-                        log.WarnFormat("Could not save effect ({0}) on player: {1}, {2}", eff, player, e);
+                    if (log.IsErrorEnabled)
+                        log.Error($"Could not save effect (Effect: {effect}) (Player: {player})", e);
                 }
             }
         }
 
         [Flags]
-        public enum PlayerUpdate : byte
+        public enum PlayerUpdate : ushort
         {
-            ICONS =         1 << 7,
-            STATUS =        1 << 6,
-            STATS =         1 << 5,
-            RESISTS =       1 << 4,
-            WEAPON_ARMOR =  1 << 3,
-            ENCUMBERANCE =  1 << 2,
-            CONCENTRATION = 1,
-            NONE =          0
+            PetWindow =     1 << 8,
+            Icons =         1 << 7,
+            Status =        1 << 6,
+            Stats =         1 << 5,
+            Resists =       1 << 4,
+            WeaponArmor =   1 << 3,
+            Encumbrance =   1 << 2,
+            Concentration = 1,
+            None =          0
         }
     }
 }

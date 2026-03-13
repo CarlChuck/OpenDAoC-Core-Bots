@@ -28,6 +28,11 @@ namespace DOL.GameServerConsole
 				log.Debug(string.Format("({0}, {1}): {2}", type, loc, msg));
 		}
 
+		public void SendRawMessage(string msg, eChatType type, eChatLoc loc)
+		{
+			SendMessage(msg, type, loc);
+		}
+
 		public void SendCustomDialog(string msg, CustomDialogResponse callback)
 		{
 			if (msg == null)
@@ -150,7 +155,7 @@ namespace DOL.GameServerConsole
 		public void SendConcentrationList() { }
 		public void SendUpdateCraftingSkills() { }
 		public void SendChangeTarget(GameObject newTarget) { }
-		public void SendChangeGroundTarget(Point3D newTarget) { }
+		public void SendChangeGroundTarget(int x, int y, int z) { }
 		public void SendPetWindow(GameLiving pet, ePetWindowAction windowAction, eAggressionState aggroState, eWalkState walkState) { }
 		public void SendKeepInfo(IGameKeep keep) { }
 		public void SendKeepRealmUpdate(IGameKeep keep) { }
@@ -192,7 +197,7 @@ namespace DOL.GameServerConsole
 		public void SendWarmapUpdate(ICollection<IGameKeep> list) { }
 		public void SendWarmapDetailUpdate(List<List<byte>> fights, List<List<byte>> groups) { }
 		public void SendWarmapBonuses() { }
-		public bool SendCheckLos(GameObject source, GameObject target, CheckLosResponse callback) { return true; }
+		public bool SendLosCheckRequest(GameObject source, GameObject target, ILosCheckListener listener) { return true; }
 		public void SendLivingDataUpdate(GameLiving living, bool updateStrings) { }
 		public void SendPlayerTitles() { }
 		public void SendPlayerTitleUpdate(GamePlayer player) { }

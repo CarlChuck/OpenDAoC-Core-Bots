@@ -101,7 +101,6 @@ namespace DOL.GS
 					spell.DamageType = (int)eDamageType.Body;
 					spell.Uninterruptible = true;
 					m_WoWPoison = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_WoWPoison);
 				}
 				return m_WoWPoison;
 			}
@@ -233,7 +232,6 @@ namespace DOL.GS
 					spell.DamageType = (int)eDamageType.Body;
 					spell.Uninterruptible = true;
 					m_WoWPoison = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_WoWPoison);
 				}
 				return m_WoWPoison;
 			}
@@ -365,7 +363,6 @@ namespace DOL.GS
 					spell.DamageType = (int)eDamageType.Body;
 					spell.Uninterruptible = true;
 					m_WoWPoison = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_WoWPoison);
 				}
 				return m_WoWPoison;
 			}
@@ -485,10 +482,9 @@ namespace DOL.GS
 					spell.Name = "Frost Shock";
 					spell.Range = 500;
 					spell.SpellID = 11876;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					m_WoWDD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_WoWDD);
 				}
 				return m_WoWDD;
 			}
@@ -609,10 +605,9 @@ namespace DOL.GS
 					spell.Name = "Frost Shock";
 					spell.Range = 500;
 					spell.SpellID = 11957;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					m_WoWDD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_WoWDD);
 				}
 				return m_WoWDD;
 			}
@@ -733,10 +728,9 @@ namespace DOL.GS
 					spell.Name = "Frost Shock";
 					spell.Range = 500;
 					spell.SpellID = 11958;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					m_WoWDD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_WoWDD);
 				}
 				return m_WoWDD;
 			}
@@ -857,10 +851,9 @@ namespace DOL.GS
 					spell.Name = "Frost Shock";
 					spell.Range = 500;
 					spell.SpellID = 11958;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					m_WoWDD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_WoWDD);
 				}
 				return m_WoWDD;
 			}
@@ -981,10 +974,9 @@ namespace DOL.GS
 					spell.Name = "Frost Shock";
 					spell.Range = 500;
 					spell.SpellID = 11877;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					m_WoWDD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_WoWDD);
 				}
 				return m_WoWDD;
 			}
@@ -1117,7 +1109,6 @@ namespace DOL.GS
 					spell.DamageType = (int)eDamageType.Body;
 					spell.Uninterruptible = true;
 					m_WoWPoison = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_WoWPoison);
 				}
 				return m_WoWPoison;
 			}

@@ -3,11 +3,13 @@ namespace DOL.GS.Spells
     [SpellHandler(eSpellType.StyleBleeding)]
     public class StyleBleeding : SpellHandler
     {
+        public override string ShortDescription => $"The target bleeds for {Spell.Damage} {Spell.DamageTypeToString()} damage every {Spell.Frequency / 1000.0} seconds for {Spell.Duration / 1000.0} seconds.";
+
         public StyleBleeding(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
 
         public override ECSGameSpellEffect CreateECSEffect(in ECSGameEffectInitParams initParams)
         {
-            return ECSGameEffectFactory.Create(initParams, static (in ECSGameEffectInitParams i) => new BleedECSEffect(i));
+            return ECSGameEffectFactory.Create(initParams, static (in i) => new BleedECSEffect(i));
         }
 
         protected override double CalculateDamageEffectiveness()

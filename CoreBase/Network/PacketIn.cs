@@ -85,13 +85,13 @@ namespace DOL.Network
 			if (maxlen <= 1024)
 			{
 				Span<byte> buffer = stackalloc byte[maxlen];
-				Read(buffer);
+				_ = Read(buffer);
 				int actualLength = buffer.IndexOf((byte) 0);
 
 				if (actualLength == -1)
 					actualLength = maxlen;
 
-				return BaseServer.defaultEncoding.GetString(buffer[..actualLength]);
+				return BaseServer.DefaultEncoding.GetString(buffer[..actualLength]);
 			}
 			else
 			{
@@ -105,7 +105,7 @@ namespace DOL.Network
 						actualLength = maxlen;
 
 					Read(buffer, 0, maxlen);
-					return BaseServer.defaultEncoding.GetString(buffer, 0, actualLength);
+					return BaseServer.DefaultEncoding.GetString(buffer, 0, actualLength);
 				}
 				finally
 				{

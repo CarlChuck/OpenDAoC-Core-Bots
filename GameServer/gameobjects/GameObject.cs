@@ -182,47 +182,7 @@ namespace DOL.GS
 		/// <summary>
 		/// Checks if object is underwater
 		/// </summary>
-		public virtual bool IsUnderwater
-		{
-			get
-			{
-				if (CurrentRegion == null || CurrentZone == null)
-					return false;
-				// Special land areas below the waterlevel in NF
-				if (CurrentRegion.ID == 163)
-				{
-					// Mount Collory
-					if ((Y > 664000) && (Y < 670000) && (X > 479000) && (X < 488000)) return false;
-					if ((Y > 656000) && (Y < 664000) && (X > 472000) && (X < 488000)) return false;
-					if ((Y > 624000) && (Y < 654000) && (X > 468500) && (X < 488000)) return false;
-					if ((Y > 659000) && (Y < 683000) && (X > 431000) && (X < 466000)) return false;
-					if ((Y > 646000) && (Y < 659001) && (X > 431000) && (X < 460000)) return false;
-					if ((Y > 624000) && (Y < 646001) && (X > 431000) && (X < 455000)) return false;
-					if ((Y > 671000) && (Y < 683000) && (X > 431000) && (X < 471000)) return false;
-					// Breifine
-					if ((Y > 558000) && (Y < 618000) && (X > 456000) && (X < 479000)) return false;
-					// Cruachan Gorge
-					if ((Y > 586000) && (Y < 618000) && (X > 360000) && (X < 424000)) return false;
-					if ((Y > 563000) && (Y < 578000) && (X > 360000) && (X < 424000)) return false;
-					// Emain Macha
-					if ((Y > 505000) && (Y < 555000) && (X > 428000) && (X < 444000)) return false;
-					// Hadrian's Wall
-					if ((Y > 500000) && (Y < 553000) && (X > 603000) && (X < 620000)) return false;
-					// Snowdonia
-					if ((Y > 633000) && (Y < 678000) && (X > 592000) && (X < 617000)) return false;
-					if ((Y > 662000) && (Y < 678000) && (X > 581000) && (X < 617000)) return false;
-					// Sauvage Forrest
-					if ((Y > 584000) && (Y < 615000) && (X > 626000) && (X < 681000)) return false;
-					// Uppland
-					if ((Y > 297000) && (Y < 353000) && (X > 610000) && (X < 652000)) return false;
-					// Yggdra
-					if ((Y > 408000) && (Y < 421000) && (X > 671000) && (X < 693000)) return false;
-					if ((Y > 364000) && (Y < 394000) && (X > 674000) && (X < 716000)) return false;
-				}
-
-				return Z < CurrentZone.Waterlevel;
-			}
-		}
+		public virtual bool IsUnderwater => CurrentZone?.IsUnderwater(X, Y, Z) == true;
 
 		/// <summary>
 		/// Holds all areas this object is currently within
@@ -261,15 +221,11 @@ namespace DOL.GS
 		/// <returns></returns>
 		public virtual bool IsVisibleTo(GameObject checkObject)
 		{
-			if (checkObject == null ||
-				CurrentRegion != checkObject.CurrentRegion ||
-				InHouse != checkObject.InHouse ||
-				(InHouse && checkObject.InHouse && CurrentHouse != checkObject.CurrentHouse))
-			{
-				return false;
-			}
-
-			return true;
+			return checkObject != null &&
+				CurrentRegion == checkObject.CurrentRegion &&
+				InHouse == checkObject.InHouse &&
+				(!InHouse || !checkObject.InHouse || CurrentHouse == checkObject.CurrentHouse) &&
+				ObjectState is eObjectState.Active;
 		}
 
 		#endregion
@@ -476,7 +432,7 @@ namespace DOL.GS
             string result = string.Empty;
             if (text == null || text.Length <= 0) return result;
             result = text[0].ToString().ToUpper();
-            if (text.Length > 1) result += text.Substring(1, text.Length - 1);
+            if (text.Length > 1) result += text.Substring(1);
             return result;
         }
 
@@ -676,6 +632,9 @@ namespace DOL.GS
 
 			foreach (GamePlayer player in GetPlayersInRadius(WorldMgr.VISIBILITY_DISTANCE))
 				player.Out.SendObjectRemove(this);
+
+			if (CurrentZone != null)
+				SubZoneObject?.InitiateSubZoneTransition(null, null);
 
 			CurrentRegion.RemoveObject(this);
 			ClearObjectsInRadiusCache();
@@ -1220,5 +1179,25 @@ namespace DOL.GS
 		}
 
 		public virtual void OnUpdateOrCreateForPlayer() { }
+
+		public virtual bool Chance(RandomDeckEvent deckEvent, int chancePercent)
+		{
+			return Util.Chance(chancePercent);
+		}
+
+		public virtual bool Chance(RandomDeckEvent deckEvent, double chancePercent)
+		{
+			return Util.Chance(chancePercent);
+		}
+
+		public virtual double GetPseudoDouble(RandomDeckEvent deckEvent)
+		{
+			return Util.RandomDouble();
+		}
+
+		public virtual double GetPseudoDoubleIncl(RandomDeckEvent deckEvent)
+		{
+			return Util.RandomDoubleIncl();
+		}
 	}
 }

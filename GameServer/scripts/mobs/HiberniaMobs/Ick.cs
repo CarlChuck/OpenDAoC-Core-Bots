@@ -129,12 +129,11 @@ namespace DOL.AI.Brain
 					spell.Name = "LifeDrain";
 					spell.Range = 1500;
 					spell.SpellID = 11945;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_IckDD = new Spell(spell, 20);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_IckDD);
 				}
 				return m_IckDD;
 			}

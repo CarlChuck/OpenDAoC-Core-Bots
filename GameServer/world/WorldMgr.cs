@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Threading;
 using DOL.Database;
 using DOL.GS.PacketHandler;
-using Microsoft.AspNetCore.Connections.Features;
+using DOL.Logging;
 
 namespace DOL.GS
 {
@@ -20,7 +20,7 @@ namespace DOL.GS
 		/// <summary>
 		/// Defines a logger for this class.
 		/// </summary>
-		private static readonly Logging.Logger log = Logging.LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
+		private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
 
 		/// <summary>
 		/// Holds the distance which player get experience from a living object
@@ -71,9 +71,6 @@ namespace DOL.GS
 		/// </summary>
 		private static Dictionary<eRealm, Dictionary<string, DbTeleport>> m_teleportLocations;
 		private static readonly Lock _syncTeleport = new();
-
-		// this is used to hold the player ids with timestamp of ld, that ld near an enemy keep structure, to allow grace period relog
-		public static ConcurrentDictionary<string, DateTime> RvrLinkDeadPlayers = new();
 
 		/// <summary>
 		/// Returns the teleport given an ID and a realm

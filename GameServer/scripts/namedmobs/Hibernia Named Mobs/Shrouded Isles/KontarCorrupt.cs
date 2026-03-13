@@ -233,12 +233,11 @@ namespace DOL.GS
 					spell.Range = 500;
 					spell.Radius = 300;
 					spell.SpellID = 11907;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_CorruptorBodyguardDD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_CorruptorBodyguardDD);
 				}
 				return m_CorruptorBodyguardDD;
 			}
@@ -295,12 +294,11 @@ namespace DOL.AI.Brain
 					spell.Name = "Corruptor Bodyguard's Heal";
 					spell.Range = 1500;
 					spell.SpellID = 11906;
-					spell.Target = "Realm";
+					spell.Target = eSpellTarget.REALM.ToString();
 					spell.Type = eSpellType.Heal.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_CorruptorBodyguardHeal = new Spell(spell, 50);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_CorruptorBodyguardHeal);
 				}
 				return m_CorruptorBodyguardHeal;
 			}

@@ -257,11 +257,10 @@ namespace DOL.AI.Brain
 					spell.Range = 0;
 					spell.Radius = 1000;
 					spell.SpellID = 12012;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Uninterruptible = true;
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					m_OreyBomb = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_OreyBomb);
 				}
 				return m_OreyBomb;
 			}
@@ -286,11 +285,10 @@ namespace DOL.AI.Brain
 					spell.Value = 73;
 					spell.Radius = 400;
 					spell.SpellID = 12013;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.StrengthConstitutionDebuff.ToString();
 					spell.DamageType = (int)eDamageType.Body;
 					m_Orey_SC_Debuff = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Orey_SC_Debuff);
 				}
 				return m_Orey_SC_Debuff;
 			}
@@ -314,10 +312,9 @@ namespace DOL.AI.Brain
 					spell.Name = "Ranged Melee Swing";
 					spell.Range = 2200;
 					spell.SpellID = 12014;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					m_OreyDD = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_OreyDD);
 				}
 				return m_OreyDD;
 			}

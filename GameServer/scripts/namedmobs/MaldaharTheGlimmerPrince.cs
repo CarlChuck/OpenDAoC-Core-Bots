@@ -181,11 +181,10 @@ namespace DOL.AI.Brain
                     spell.Range = 2500;
                     spell.Radius = 250;
                     spell.SpellID = 710;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "Lifedrain";
                     spell.DamageType = (int) eDamageType.Body;
                     m_Lifetap = new Spell(spell, 60);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Lifetap);
                 }
 
                 return m_Lifetap;
@@ -217,11 +216,10 @@ namespace DOL.AI.Brain
                     spell.Range = 2500;
                     spell.Radius = 550;
                     spell.SpellID = 4204;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "DirectDamage";
                     spell.DamageType = (int) eDamageType.Energy;
                     m_PBAoe = new Spell(spell, 60);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_PBAoe);
                 }
 
                 return m_PBAoe;

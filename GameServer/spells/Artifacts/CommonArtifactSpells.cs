@@ -1,4 +1,3 @@
-using DOL.AI.Brain;
 using DOL.GS.Effects;
 
 namespace DOL.GS.Spells
@@ -26,7 +25,7 @@ namespace DOL.GS.Spells
             effect.Owner.DebuffCategory[eProperty.Quickness] += (int)m_spell.Value;
             effect.Owner.DebuffCategory[eProperty.Intelligence] += (int)m_spell.Value;
             effect.Owner.DebuffCategory[eProperty.Charisma] += (int)m_spell.Value;   
-            effect.Owner.DebuffCategory[eProperty.ArmorAbsorption] += (int)m_spell.Value; 
+            effect.Owner.DebuffCategory[eProperty.PhysicalAbsorption] += (int)m_spell.Value; 
             effect.Owner.DebuffCategory[eProperty.MagicAbsorption] += (int)m_spell.Value; 
             
             if(effect.Owner is GamePlayer)
@@ -49,7 +48,7 @@ namespace DOL.GS.Spells
             effect.Owner.DebuffCategory[eProperty.Quickness] -= (int)m_spell.Value;
             effect.Owner.DebuffCategory[eProperty.Intelligence] -= (int)m_spell.Value;
             effect.Owner.DebuffCategory[eProperty.Charisma] -= (int)m_spell.Value;        
-            effect.Owner.DebuffCategory[eProperty.ArmorAbsorption] -= (int)m_spell.Value; 
+            effect.Owner.DebuffCategory[eProperty.PhysicalAbsorption] -= (int)m_spell.Value; 
             effect.Owner.DebuffCategory[eProperty.MagicAbsorption] -= (int)m_spell.Value; 
  
             if(effect.Owner is GamePlayer)
@@ -76,12 +75,6 @@ namespace DOL.GS.Spells
 				target.LastAttackedByEnemyTickPvP = GameLoop.GameLoopTime;
                 Caster.LastAttackTickPvP = GameLoop.GameLoopTime;
             }
-			if(target is GameNPC) 
-			{
-				IOldAggressiveBrain aggroBrain = ((GameNPC)target).Brain as IOldAggressiveBrain;
-				if (aggroBrain != null)
-					aggroBrain.AddToAggroList(Caster, (int)Spell.Value);
-			}
 		}		
         public AllStatsDebuff(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
     }
@@ -146,12 +139,6 @@ namespace DOL.GS.Spells
 				target.LastAttackedByEnemyTickPvP = GameLoop.GameLoopTime;
                 Caster.LastAttackTickPvP = GameLoop.GameLoopTime;
             }
-			if(target is GameNPC) 
-			{
-				IOldAggressiveBrain aggroBrain = ((GameNPC)target).Brain as IOldAggressiveBrain;
-				if (aggroBrain != null)
-					aggroBrain.AddToAggroList(Caster, (int)Spell.Value);
-			}
 		}	
         public LoreDebuff(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
     }

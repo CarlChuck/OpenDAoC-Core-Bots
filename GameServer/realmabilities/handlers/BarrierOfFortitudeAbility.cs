@@ -43,7 +43,7 @@ namespace DOL.GS.RealmAbilities
 				SendCasterSpellEffect(playerInGroup, 10535, success);
 				
 				if (success)
-					ECSGameEffectFactory.Create(new(playerInGroup, m_duration, GetAbsorbAmount(), CreateSpell(player)), static (in ECSGameEffectInitParams i) => new BunkerOfFaithECSEffect(i));
+					ECSGameEffectFactory.Create(new(playerInGroup, m_duration, 1, CreateSpell(player)), static (in i) => new BunkerOfFaithECSEffect(i));
 			}
 
 			DisableSkill(player);
@@ -57,10 +57,10 @@ namespace DOL.GS.RealmAbilities
 			m_dbspell.ClientEffect = 4242;
 			m_dbspell.Damage = 0;
 			m_dbspell.DamageType = 0;
-			m_dbspell.Target = "Group";
+			m_dbspell.Target = eSpellTarget.GROUP.ToString();
 			m_dbspell.Radius = 0;
 			m_dbspell.Type = eSpellType.ArmorAbsorptionBuff.ToString();
-			m_dbspell.Value = 50;
+			m_dbspell.Value = GetAbsorbAmount();
 			m_dbspell.Duration = 30;
 			m_dbspell.Pulse = 0;
 			m_dbspell.PulsePower = 0;

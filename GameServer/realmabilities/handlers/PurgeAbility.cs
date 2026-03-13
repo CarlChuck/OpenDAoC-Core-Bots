@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using DOL.Database;
 using DOL.GS.PacketHandler;
+using DOL.GS.PlayerClass;
 using DOL.Language;
 
 namespace DOL.GS.RealmAbilities
@@ -79,23 +80,15 @@ namespace DOL.GS.RealmAbilities
 
             EffectListComponent effectListComponent = null;
 
-            if (player.CharacterClass.ID == (int)eCharacterClass.Necromancer)
+            if (player.CharacterClass is ClassDisciple)
             {
-                NecromancerPet necroPet = (NecromancerPet)player.ControlledBrain.Body;
-
-                if (necroPet != null)
-                {
+                if (player.ControlledBrain?.Body is NecromancerPet necroPet)
                     effectListComponent = necroPet.effectListComponent;
-                }
                 else
-                {
                     effectListComponent = player.effectListComponent;
-                }
             }
             else
-            {
                 effectListComponent = player.effectListComponent;
-            }
 
             if (effectListComponent == null)
                 return false;
@@ -115,7 +108,7 @@ namespace DOL.GS.RealmAbilities
             // Cancel effects
             foreach (ECSGameEffect effect in effectsToRemove)
             {
-                effect.Stop();
+                effect.End();
                 removed = true;
             }
 

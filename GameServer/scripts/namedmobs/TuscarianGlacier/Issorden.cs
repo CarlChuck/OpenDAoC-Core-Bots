@@ -199,13 +199,12 @@ namespace DOL.AI.Brain
                     spell.Name = "Issorden Root";
                     spell.TooltipId = 277;
                     spell.SpellID = 11741;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "SpeedDecrease";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int) eDamageType.Cold;
                     m_IssoRoot = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_IssoRoot);
                 }
                 return m_IssoRoot;
             }
@@ -234,7 +233,6 @@ namespace DOL.AI.Brain
                     spell.MoveCast = true;
                     spell.DamageType = (int)eDamageType.Cold;
                     m_Isso_Bolt = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Isso_Bolt);
                 }
                 return m_Isso_Bolt;
             }

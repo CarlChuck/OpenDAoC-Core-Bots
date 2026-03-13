@@ -1,15 +1,16 @@
 using System.Reflection;
 using System.Threading.Tasks;
 using DOL.Database;
+using DOL.Logging;
 
 namespace DOL.GS.PacketHandler.Client.v168
 {
     [PacketHandlerAttribute(PacketHandlerType.TCP, eClientPackets.WorldInitRequest, "Handles world init replies", eClientStatus.LoggedIn)]
-    public class WorldInitRequestHandler : IPacketHandler
+    public class WorldInitRequestHandler : PacketHandler
     {
-        private static readonly Logging.Logger log = Logging.LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
 
-        public async void HandlePacket(GameClient client, GSPacketIn packet)
+        protected async override void HandlePacketInternal(GameClient client, GSPacketIn packet)
         {
             if (client.ClientState is not GameClient.eClientState.CharScreen and not GameClient.eClientState.Playing)
                 return;
@@ -142,11 +143,8 @@ namespace DOL.GS.PacketHandler.Client.v168
                                                 //GSMessages.SendDebugMode(client,client.Account.PrivLevel>1);
             player.UpdateEncumbrance(); // Update encumbrance on init.
 
-            // Don't unstealth GMs.
-            if (player.Client.Account.PrivLevel > 1)
-                player.GMStealthed = player.IsStealthed;
-            else
-                player.Stealth(false);
+            // Automatically stealth GM/Admin players.
+            player.Stealth((ePrivLevel) player.Client.Account.PrivLevel >= ePrivLevel.GM);
 
             player.Out.SendSetControlledHorse(player);
 

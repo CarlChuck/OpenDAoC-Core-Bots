@@ -34,7 +34,8 @@ namespace DOL.GS
 
 		#region Combat
 
-		public bool IsBeingHandledByReaperService { get; set; }
+		private bool _isBeingHandledByReaperService;
+		public bool IsBeingHandledByReaperService => Volatile.Read(ref _isBeingHandledByReaperService);
 
 		protected string m_lastInterruptMessage;
 		public string LastInterruptMessage
@@ -46,6 +47,8 @@ namespace DOL.GS
 		// Both represent what percentage of this entity's target's defenses should be used, not how much is removed.
 		public virtual double DualWieldDefensePenetrationFactor => 0.5;
 		public virtual double TwoHandedDefensePenetrationFactor => 0.5;
+
+		public virtual bool BenefitsFromRelics => false;
 
 		/// <summary>
 		/// Can this living accept any item regardless of tradable or droppable?
@@ -209,14 +212,6 @@ namespace DOL.GS
 			return new GameSummonedPet(template);
 		}
 
-		/// <summary>
-		/// A new pet has been summoned, do we do anything?
-		/// </summary>
-		/// <param name="pet"></param>
-		public virtual void OnPetSummoned(GameSummonedPet pet)
-		{
-		}
-
 		public virtual long LastAttackTickPvE { get; set; }
 		public virtual long LastAttackTickPvP { get; set; }
 		public virtual long LastAttackedByEnemyTickPvE { get; set; }
@@ -229,7 +224,7 @@ namespace DOL.GS
 
 		public virtual bool InCombatPvE => LastCombatTickPvE > 0 && LastCombatTickPvE + IN_COMBAT_DURATION >= GameLoop.GameLoopTime;
 		public virtual bool InCombatPvP => LastCombatTickPvP > 0 && LastCombatTickPvP + IN_COMBAT_DURATION >= GameLoop.GameLoopTime;
-		public virtual bool InCombat => InCombatInLast(IN_COMBAT_DURATION);
+		public virtual bool InCombat => InCombatInLast(IN_COMBAT_DURATION) || IsCrowdControlled;
 
 		public virtual bool InCombatInLast(int milliseconds)
 		{
@@ -318,33 +313,40 @@ namespace DOL.GS
 			return GetModified(eProperty.Strength);
 		}
 
-		/// <summary>
-		/// calculate item armor factor influenced by quality, con and duration
-		/// </summary>
-		/// <param name="slot"></param>
-		/// <returns></returns>
 		public virtual double GetArmorAF(eArmorSlot slot)
 		{
-			return Math.Max(0, GetModified(eProperty.ArmorFactor) / 6.0);
+			return Math.Max(0, GetModified(eProperty.ArmorFactor) / 5.0);
 		}
 
-		/// <summary>
-		/// Calculates armor absorb level
-		/// </summary>
 		public virtual double GetArmorAbsorb(eArmorSlot slot)
 		{
-			double baseAbsorb = 0;
-
-			if (this is NecromancerPet necromancerPet)
-				baseAbsorb = necromancerPet.Owner.Level * 0.0068; // 34% at owner level 50.
-			else
-				baseAbsorb = Level * 0.0054; // 27% at level 50.
-
-			double absorbBonus = GetModified(eProperty.ArmorAbsorption) / 100.0;
-			double absorptionFromConstitution = StatCalculator.CalculateBuffContributionToAbsorbOrResist(this, eProperty.Constitution) / 5.5;
-			double absorptionFromDexterity = StatCalculator.CalculateBuffContributionToAbsorbOrResist(this, eProperty.Dexterity) / 5.5;
-			double absorb = 1 - (1 - baseAbsorb) * (1 - absorbBonus) * (1 - absorptionFromConstitution) * (1 - absorptionFromDexterity);
+			// Combine base and stats using multiplicative stacking for diminishing returns.
+			// This doesn't apply to eProperty.ArmorAbsorption (normally used as debuffs).
+			// This method doesn't handle eProperty.PhysicalAbsorption (handled by AttackComponent),
+			// and thus doesn't reflect the final absorb.
+			double absorb = 1 - (1 - GetBaseAbsorb()) * (1 - GetStatContributionToArmorAbsorb());
+			absorb *= 1 + GetModified(eProperty.ArmorAbsorption) * 0.01;
 			return Math.Clamp(absorb, 0, 1);
+		}
+
+		private double GetBaseAbsorb()
+		{
+			const double NECRO_ABSORB_PER_LEVEL = 0.0068; // 34% at lvl 50
+			const double NPC_ABSORB_PER_LEVEL = 0.0054;   // 27% at lvl 50
+
+			// Use owner level for necromancer pets.
+			if (this is NecromancerPet necromancerPet)
+				return necromancerPet.Owner.Level * NECRO_ABSORB_PER_LEVEL;
+
+			return Level * NPC_ABSORB_PER_LEVEL;
+		}
+
+		private double GetStatContributionToArmorAbsorb()
+		{
+			const double DIVISOR = 5.5;
+			double conPart = StatCalculator.CalculateBuffContributionToAbsorbOrResist(this, eProperty.Constitution) / DIVISOR;
+			double dexPart = StatCalculator.CalculateBuffContributionToAbsorbOrResist(this, eProperty.Dexterity) / DIVISOR;
+			return 1 - (1 - conPart) * (1 - dexPart);
 		}
 
 		/// <summary>
@@ -804,11 +806,11 @@ namespace DOL.GS
             }
 
             // Proc #1
-            if (procSpell != null && Util.ChanceDouble(procChance))
+            if (procSpell != null && Chance(RandomDeckEvent.OffensiveProcChance, procChance))
                 StartWeaponMagicalEffect(weapon, ad, SkillBase.GetSpellLine(GlobalSpellsLines.Item_Effects), weapon.ProcSpellID, false);
 
             // Proc #2
-            if (procSpell1 != null && Util.ChanceDouble(procChance))
+            if (procSpell1 != null && Chance(RandomDeckEvent.OffensiveProcChance, procChance))
                 StartWeaponMagicalEffect(weapon, ad, SkillBase.GetSpellLine(GlobalSpellsLines.Item_Effects), weapon.ProcSpellID1, false);
 
 			// Poison
@@ -830,7 +832,7 @@ namespace DOL.GS
 				{
 					GamePlayer PlayerAttacker = ad.Attacker as GamePlayer;
 					if (PlayerAttacker.GetSpellLine("Spymaster") != null)
-						if (Util.ChanceDouble((double)(15 * 0.0001))) return;
+						if (Util.Chance((double)(15 * 0.0001))) return;
 				}
 				weapon.PoisonCharges--;
 				if (weapon.PoisonCharges <= 0) { weapon.PoisonMaxCharges = 0; weapon.PoisonSpellID = 0; }
@@ -901,10 +903,10 @@ namespace DOL.GS
 			int chance = armor.ProcChance > 0 ? armor.ProcChance : 10;
 			SpellLine spellLine = SkillBase.GetSpellLine(GlobalSpellsLines.Item_Effects);
 
-			if (armor.ProcSpellID != 0 && Util.Chance(chance))
+			if (armor.ProcSpellID != 0 && Chance(RandomDeckEvent.DefensiveProcChance, chance))
 				StartArmorMagicalEffect(armor, ad.Attacker, SkillBase.FindSpell(armor.ProcSpellID, spellLine), spellLine);
 
-			if (armor.ProcSpellID1 != 0 && Util.Chance(chance))
+			if (armor.ProcSpellID1 != 0 && Chance(RandomDeckEvent.DefensiveProcChance, chance))
 				StartArmorMagicalEffect(armor, ad.Attacker, SkillBase.FindSpell(armor.ProcSpellID1, spellLine), spellLine);
 		}
 
@@ -1256,10 +1258,17 @@ namespace DOL.GS
 					return 0;
 
 				baseBlockChance = GetModified(eProperty.BlockChance);
-				baseBlockChance *= shield.Quality * 0.01 * (shield.Condition / (double) shield.MaxCondition);
+				baseBlockChance *= shield.Quality * 0.01 * shield.ConditionPercent * 0.01;
 			}
 			else
+			{
 				baseBlockChance = GetModified(eProperty.BlockChance);
+
+				// Ensure NPCs with no base block chance set don't receive any bonus.
+				// This is probably a NPC with an offhand weapon but no offhand swing chance set either.
+				if (baseBlockChance == 0)
+					return 0;
+			}
 
 			baseBlockChance /= 1000; // Not a typo.
 
@@ -1338,7 +1347,7 @@ namespace DOL.GS
 					{
 						foreach (GameLiving living in attackerPlayer.Group.GetMembersInTheGroup())
 						{
-							if (IsWithinRadius(living, WorldMgr.MAX_EXPFORKILL_DISTANCE) && living.IsAlive && living.ObjectState is eObjectState.Active)
+							if (IsWithinRadius(living, WorldMgr.MAX_EXPFORKILL_DISTANCE) && living.ObjectState is eObjectState.Active)
 							{
 								if (living == attackerPlayer)
 									AddXPGainer(living, damageDealt);
@@ -1375,18 +1384,13 @@ namespace DOL.GS
 
 			Health -= damageAmount + criticalAmount;
 
-			if (IsAlive)
-				return;
-
-			if (_dieLock.TryEnter())
+			// Protect calls to Die, since most overrides aren't thread safe.
+			if (!IsAlive && _dieLock.TryEnter())
 			{
 				try
 				{
 					if (!IsBeingHandledByReaperService)
-					{
-						IsBeingHandledByReaperService = true;
 						Die(source);
-					}
 				}
 				finally
 				{
@@ -1450,7 +1454,7 @@ namespace DOL.GS
 		/// <param name="ad">information about the attack</param>
 		public virtual void OnAttackedByEnemy(AttackData ad)
 		{
-			HandleControlledPetCombatMessage(ad);
+			HandleControlledPetCombatMessageOnAttacked(ad);
 
 			// Note that this function is called whenever an attack is received, regardless of whether that attack was successful.
 			// i.e. missed melee swings and resisted spells still trigger this.
@@ -1458,25 +1462,16 @@ namespace DOL.GS
 			if (ad == null)
 				return;
 
-			// Dead attackers (typically from DoTs) don't put the target in combat, break CC or stealth.
-			bool attackerAlive = ad.Attacker.IsAlive;
-
-			// Must be above the IsHit/Combat check below, since things like subsequent DoT ticks don't cause combat but should still break CC.
-			if (attackerAlive)
-				HandleCrowdControlOnAttacked(ad);
+			HandleCrowdControlOnAttacked(ad);
 
 			if (ad.IsHit && ad.CausesCombat)
 			{
-				// Dead attackers don't break speed or unstealth.
-				if (attackerAlive)
-				{
-					TryCancelMovementSpeedBuffs(ad, false);
+				TryCancelMovementSpeedBuffs(ad, false);
 
-					if (ad.AttackType is not eAttackType.Spell || ad.Damage != 0)
-					{
-						if (IsStealthed && !effectListComponent.ContainsEffectForEffectType(eEffect.Vanish))
-							Stealth(false);
-					}
+				if (ad.AttackType is not eAttackType.Spell || ad.Damage != 0)
+				{
+					if (IsStealthed && !effectListComponent.ContainsEffectForEffectType(eEffect.Vanish))
+						Stealth(false);
 				}
 
 				if (this is GameNPC gameNpc && ActiveWeaponSlot is eActiveWeaponSlot.Distance && IsWithinRadius(ad.Attacker, 150))
@@ -1484,7 +1479,7 @@ namespace DOL.GS
 
 				attackComponent.AddAttacker(ad);
 
-				if (attackerAlive && ad.Attacker != this)
+				if (ad.Attacker != this)
 				{
 					if (ad.Attacker.Realm is eRealm.None || Realm is eRealm.None)
 						LastAttackedByEnemyTickPvE = GameLoop.GameLoopTime;
@@ -1527,7 +1522,7 @@ namespace DOL.GS
 							playerAttacker.Out.SendMessage(LanguageMgr.GetTranslation(playerAttacker.Client, "AblativeArmor.Attacker", damageAbsorbed), eChatType.CT_Spell, eChatLoc.CL_SystemWindow);
 
 						if (ablativeHp <= 0)
-							effect.Stop();
+							effect.End();
 						else
 							effect.RemainingValue = ablativeHp;
 					}
@@ -1544,156 +1539,156 @@ namespace DOL.GS
 			}
 			else if (ad.IsSpellResisted && ad.Target is GameNPC npc)
 				npc.CancelReturnToSpawnPoint();
+		}
 
-			void HandleControlledPetCombatMessage(AttackData ad)
+		private void HandleControlledPetCombatMessageOnAttacked(AttackData ad)
+		{
+			if (ad.AttackType is eAttackType.Spell)
 			{
-				if (ad.AttackType is eAttackType.Spell)
+				if (ad.Damage > 0 && this is GameNPC npc && npc.Brain is IControlledBrain controlledBrain)
 				{
-					if (ad.Damage > 0 && this is GameNPC npc && npc.Brain is IControlledBrain controlledBrain)
+					GamePlayer player = controlledBrain.GetPlayerOwner();
+
+					if (player != null)
 					{
-						GamePlayer player = controlledBrain.GetPlayerOwner();
+						string modMessage = string.Empty;
 
-						if (player != null)
+						if (ad.Modifier > 0)
+							modMessage = $" (+{ad.Modifier})";
+						else if (ad.Modifier < 0)
+							modMessage = $" ({ad.Modifier})";
+
+						player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.HitsForDamage"), ad.Attacker.GetName(0, true), ad.Target.Name, ad.Damage, modMessage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
+
+						if (ad.CriticalDamage > 0)
+							player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.CriticallyHitsForDamage"), ad.Attacker.GetName(0, true), ad.Target.Name, ad.CriticalDamage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
+					}
+				}
+			}
+			else
+			{
+				if (ad.Attacker is GameNPC npc && npc.Brain is IControlledBrain brain)
+				{
+					GamePlayer player = brain.GetPlayerOwner();
+
+					if (player != null)
+					{
+						switch (ad.AttackResult)
 						{
-							string modMessage = string.Empty;
+							case eAttackResult.HitStyle:
+							case eAttackResult.HitUnstyled:
+							{
+								string modMessage;
 
-							if (ad.Modifier > 0)
-								modMessage = $" (+{ad.Modifier})";
-							else if (ad.Modifier < 0)
-								modMessage = $" ({ad.Modifier})";
+								if (ad.Modifier > 0)
+									modMessage = $" (+{ad.Modifier})";
+								else if (ad.Modifier < 0)
+									modMessage = $" ({ad.Modifier})";
+								else
+									modMessage = string.Empty;
 
-							player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.HitsForDamage"), ad.Attacker.GetName(0, true), ad.Target.Name, ad.Damage, modMessage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
+								string attackTypeMsg;
 
-							if (ad.CriticalDamage > 0)
-								player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.CriticallyHitsForDamage"), ad.Attacker.GetName(0, true), ad.Target.Name, ad.CriticalDamage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
+								if (ad.AttackType is eAttackType.Ranged)
+									attackTypeMsg = "shoots";
+								else
+									attackTypeMsg = "attacks";
+
+								if (ad.AttackResult is eAttackResult.HitStyle)
+								{
+									string damageAmount = $" (+{ad.StyleDamage}, GR: {ad.Style.GrowthRate})";
+									string message = LanguageMgr.GetTranslation(player.Client.Account.Language, "StyleProcessor.ExecuteStyle.PerformPerfectly", ad.Style.Name, damageAmount);
+									player.Out.SendMessage(message, eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
+								}
+
+								player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.YourHits"),
+									ad.Attacker.Name, attackTypeMsg, ad.Target.GetName(0, false), ad.Damage, modMessage),
+									eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
+
+								if (ad.CriticalDamage > 0)
+								{
+									player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.YourCriticallyHits"),
+										ad.Attacker.Name, ad.Target.GetName(0, false), ad.CriticalDamage) + $" ({ad.CriticalChance}%)",
+										eChatType.CT_YouHit,eChatLoc.CL_SystemWindow);
+								}
+
+								break;
+							}
+							case eAttackResult.Missed:
+							{
+								if (!string.IsNullOrEmpty(ad.BroadcastMessage))
+									player.Out.SendMessage($"{ad.BroadcastMessage} ({ad.MissChance:0.##}%)", eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
+
+								break;
+							}
+							default:
+							{
+								if (!string.IsNullOrEmpty(ad.BroadcastMessage))
+									player.Out.SendMessage(ad.BroadcastMessage, eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
+
+								break;
+							}
 						}
 					}
 				}
-				else
+
+				if (ad.Target is GameNPC npcTarget && npcTarget.Brain is IControlledBrain targetBrain)
 				{
-					if (ad.Attacker is GameNPC npc && npc.Brain is IControlledBrain brain)
+					GamePlayer player = targetBrain.GetPlayerOwner();
+
+					if (player != null)
 					{
-						GamePlayer player = brain.GetPlayerOwner();
-
-						if (player != null)
+						switch (ad.AttackResult)
 						{
-							switch (ad.AttackResult)
+							case eAttackResult.Blocked:
 							{
-								case eAttackResult.HitStyle:
-								case eAttackResult.HitUnstyled:
-								{
-									string modMessage;
-
-									if (ad.Modifier > 0)
-										modMessage = $" (+{ad.Modifier})";
-									else if (ad.Modifier < 0)
-										modMessage = $" ({ad.Modifier})";
-									else
-										modMessage = string.Empty;
-
-									string attackTypeMsg;
-
-									if (ad.AttackType is eAttackType.Ranged)
-										attackTypeMsg = "shoots";
-									else
-										attackTypeMsg = "attacks";
-
-									if (ad.AttackResult is eAttackResult.HitStyle)
-									{
-										string damageAmount = $" (+{ad.StyleDamage}, GR: {ad.Style.GrowthRate})";
-										string message = LanguageMgr.GetTranslation(player.Client.Account.Language, "StyleProcessor.ExecuteStyle.PerformPerfectly", ad.Style.Name, damageAmount);
-										player.Out.SendMessage(message, eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
-									}
-
-									player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.YourHits"),
-										ad.Attacker.Name, attackTypeMsg, ad.Target.GetName(0, false), ad.Damage, modMessage),
-										eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
-
-									if (ad.CriticalDamage > 0)
-									{
-										player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.YourCriticallyHits"),
-											ad.Attacker.Name, ad.Target.GetName(0, false), ad.CriticalDamage) + $" ({ad.CriticalChance}%)",
-											eChatType.CT_YouHit,eChatLoc.CL_SystemWindow);
-									}
-
-									break;
-								}
-								case eAttackResult.Missed:
-								{
-									if (!string.IsNullOrEmpty(ad.BroadcastMessage))
-										player.Out.SendMessage($"{ad.BroadcastMessage} ({ad.MissChance:0.##}%)", eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
-
-									break;
-								}
-								default:
-								{
-									if (!string.IsNullOrEmpty(ad.BroadcastMessage))
-										player.Out.SendMessage(ad.BroadcastMessage, eChatType.CT_YouHit, eChatLoc.CL_SystemWindow);
-
-									break;
-								}
+								player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.Blocked"), ad.Attacker.GetName(0, true), ad.Target.Name), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
+								break;
 							}
-						}
-					}
-
-					if (ad.Target is GameNPC npcTarget && npcTarget.Brain is IControlledBrain targetBrain)
-					{
-						GamePlayer player = targetBrain.GetPlayerOwner();
-
-						if (player != null)
-						{
-							switch (ad.AttackResult)
+							case eAttackResult.Parried:
 							{
-								case eAttackResult.Blocked:
-								{
-									player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.Blocked"), ad.Attacker.GetName(0, true), ad.Target.Name), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
-									break;
-								}
-								case eAttackResult.Parried:
-								{
-									player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.Parried"), ad.Attacker.GetName(0, true), ad.Target.Name), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
-									break;
-								}
-								case eAttackResult.Evaded:
-								{
-									player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.Evaded"), ad.Attacker.GetName(0, true), ad.Target.Name), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
-									break;
-								}
-								case eAttackResult.Fumbled:
-								{
-									player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.Fumbled"), ad.Attacker.GetName(0, true)), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
-									break;
-								}
-								case eAttackResult.Missed:
-								{
-									if (ad.AttackType is eAttackType.Spell)
-										break;
-
-									player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.Misses"), ad.Attacker.GetName(0, true), ad.Target.Name), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
-									break;
-								}
-								case eAttackResult.HitStyle:
-								case eAttackResult.HitUnstyled:
-								{
-									string modMessage;
-
-									if (ad.Modifier > 0)
-										modMessage = $" (+{ad.Modifier})";
-									else if (ad.Modifier < 0)
-										modMessage = $" ({ad.Modifier})";
-									else
-										modMessage = string.Empty;
-
-									player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.HitsForDamage"), ad.Attacker.GetName(0, true), ad.Target.Name, ad.Damage, modMessage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
-
-									if (ad.CriticalDamage > 0)
-										player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.CriticallyHitsForDamage"), ad.Attacker.GetName(0, true), ad.Target.Name, ad.CriticalDamage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
-
-									break;
-								}
-								default:
-									break;
+								player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.Parried"), ad.Attacker.GetName(0, true), ad.Target.Name), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
+								break;
 							}
+							case eAttackResult.Evaded:
+							{
+								player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.Evaded"), ad.Attacker.GetName(0, true), ad.Target.Name), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
+								break;
+							}
+							case eAttackResult.Fumbled:
+							{
+								player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.Fumbled"), ad.Attacker.GetName(0, true)), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
+								break;
+							}
+							case eAttackResult.Missed:
+							{
+								if (ad.AttackType is eAttackType.Spell)
+									break;
+
+								player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.Misses"), ad.Attacker.GetName(0, true), ad.Target.Name), eChatType.CT_Missed, eChatLoc.CL_SystemWindow);
+								break;
+							}
+							case eAttackResult.HitStyle:
+							case eAttackResult.HitUnstyled:
+							{
+								string modMessage;
+
+								if (ad.Modifier > 0)
+									modMessage = $" (+{ad.Modifier})";
+								else if (ad.Modifier < 0)
+									modMessage = $" ({ad.Modifier})";
+								else
+									modMessage = string.Empty;
+
+								player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.HitsForDamage"), ad.Attacker.GetName(0, true), ad.Target.Name, ad.Damage, modMessage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
+
+								if (ad.CriticalDamage > 0)
+									player.Out.SendMessage(string.Format(LanguageMgr.GetTranslation(player.Client.Account.Language, "GameLiving.AttackData.CriticallyHitsForDamage"), ad.Attacker.GetName(0, true), ad.Target.Name, ad.CriticalDamage), eChatType.CT_Damaged, eChatLoc.CL_SystemWindow);
+
+								break;
+							}
+							default:
+								break;
 						}
 					}
 				}
@@ -1709,28 +1704,30 @@ namespace DOL.GS
 				return false;
 
 			bool removeMez = false;
-			bool removeSnare = false; // Immunity-triggering snare/root spells
-			bool removeMovementSpeedDebuff = false; // Non-immunity snares like focus snare, melee snares, DD+Snare spells, etc.
+			bool removeMovementSpeedDebuff = false;
 
 			// Attack was Melee
-			if (ad.AttackType != AttackData.eAttackType.Spell)
+			if (ad.AttackType is not eAttackType.Spell)
 			{
 				switch (ad.AttackResult)
 				{
 					case eAttackResult.HitStyle:
 					case eAttackResult.HitUnstyled:
-						removeSnare = true;
+					{
 						removeMez = true;
 						removeMovementSpeedDebuff = true;
 						break;
+					}
 					case eAttackResult.Blocked:
 					case eAttackResult.Evaded:
 					case eAttackResult.Fumbled:
 					case eAttackResult.Missed:
 					case eAttackResult.Parried:
+					{
 						// Missed melee swings still break mez.
 						removeMez = true;
 						break;
+					}
 				}
 			}
 			// Attack was a Spell. Note that a spell being resisted does not mean it does not break mez.
@@ -1740,7 +1737,6 @@ namespace DOL.GS
 				{
 					// Any damage breaks mez and snare/root.
 					removeMez = true;
-					removeSnare = true;
 					removeMovementSpeedDebuff = true;
 				}
 				else if (ad.SpellHandler is
@@ -1766,35 +1762,32 @@ namespace DOL.GS
 					case eEffect.Mez:
 					{
 						if (removeMez)
-							effect.Stop();
-
-						break;
-					}
-					case eEffect.Snare:
-					{
-						if (removeSnare)
-							effect.Stop();
+							effect.End();
 
 						break;
 					}
 					case eEffect.MovementSpeedDebuff:
 					{
-						if (removeMovementSpeedDebuff && effect is ECSGameSpellEffect spellEffect && spellEffect.SpellHandler.Spell.SpellType is not eSpellType.UnbreakableSpeedDecrease)
-							effect.Stop();
+						if (removeMovementSpeedDebuff &&
+							effect is ECSGameSpellEffect spellEffect &&
+							spellEffect.SpellHandler.Spell.SpellType is not eSpellType.UnbreakableSpeedDecrease and not eSpellType.PreventFlight)
+						{
+							effect.End();
+						}
 
 						break;
 					}
 					case eEffect.Ichor:
 					{
 						if (removeMovementSpeedDebuff)
-							effect.Stop();
+							effect.End();
 
 						break;
 					}
 				}
 			}
 
-			return removeMez || removeSnare || removeMovementSpeedDebuff;
+			return removeMez || removeMovementSpeedDebuff;
 		}
 
 		public virtual void TryCancelMovementSpeedBuffs(AttackData attackData, bool isAttacker)
@@ -1807,14 +1800,12 @@ namespace DOL.GS
 				foreach (ECSGameSpellEffect effect in effects)
 				{
 					// Ignore Whip of Encouragement; Tracker, Chaser, Pursuer Enhancement.
+					// Relying on the `Spell.Target` property to identify these.
 					if (effect.SpellHandler.Spell.Target is eSpellTarget.PET)
-					{
-						if (effect.SpellHandler.Spell.ID is 305 or (>= 895 and <= 897))
-							continue;
-					}
+						continue;
 
 					if (ShouldBeCancelled(attackData, effect))
-						effect.Stop();
+						effect.End();
 				}
 			}
 
@@ -1826,7 +1817,7 @@ namespace DOL.GS
 				foreach (ECSGameSpellEffect effect in ownerEffects)
 				{
 					if (ShouldBeCancelled(attackData, effect))
-						effect.Stop();
+						effect.End();
 				}
 			}
 
@@ -1941,111 +1932,97 @@ namespace DOL.GS
 		}
 
 		/// <summary>
-		/// Called when an enemy of ours is healed during combat
-		/// </summary>
-		/// <param name="enemy">the enemy</param>
-		/// <param name="healSource">the healer</param>
-		/// <param name="changeType">the healtype</param>
-		/// <param name="healAmount">the healamount</param>
-		public virtual void EnemyHealed(GameLiving enemy, GameObject healSource, eHealthChangeType changeType, int healAmount)
-		{
-			Notify(GameLivingEvent.EnemyHealed, this, new EnemyHealedEventArgs(enemy, healSource, changeType, healAmount));
-		}
-
-		/// <summary>
 		/// Called when this living dies
 		/// </summary>
 		public virtual void Die(GameObject killer)
 		{
-			IsBeingHandledByReaperService = true;
-			ReaperService.KillLiving(this, killer);
+			if (Interlocked.Exchange(ref _isBeingHandledByReaperService, true) == false)
+				ReaperService.KillLiving(this, killer);
+		}
+
+		public void OnReaperServiceHandlingComplete()
+		{
+			Volatile.Write(ref _isBeingHandledByReaperService, false);
 		}
 
 		public virtual void ProcessDeath(GameObject killer)
 		{
-			try
+			attackComponent.StopAttack();
+			List<GamePlayer> playerAttackers = new();
+
+			foreach (GameObject attacker in attackComponent.AttackerTracker.Attackers)
 			{
-				attackComponent.StopAttack();
-				List<GamePlayer> playerAttackers = new();
+				if (attacker is not GameLiving livingAttacker)
+					continue;
 
-				foreach (GameObject attacker in attackComponent.AttackerTracker.Attackers)
+				GamePlayer player = attacker as GamePlayer;
+
+				if (attacker is GameNPC npcAttacker && npcAttacker.Brain is IControlledBrain npcAttackerBrain)
 				{
-					if (attacker is not GameLiving livingAttacker)
-						continue;
-
-					GamePlayer player = attacker as GamePlayer;
-
-					if (attacker is GameNPC npcAttacker && npcAttacker.Brain is IControlledBrain npcAttackerBrain)
-					{
-						// Ok, we're a pet - if our Player owner isn't in the attacker list, let's make them a 'virtual' attacker
-						player = npcAttackerBrain.GetPlayerOwner();
-
-						if (player != null)
-						{
-							if (!attackComponent.AttackerTracker.ContainsAttacker(player))
-							{
-								if (!playerAttackers.Contains(player))
-									playerAttackers.Add(player);
-							}
-
-							// Pet gets the killed message as well
-							livingAttacker.EnemyKilled(this);
-						}
-					}
+					// Ok, we're a pet - if our Player owner isn't in the attacker list, let's make them a 'virtual' attacker
+					player = npcAttackerBrain.GetPlayerOwner();
 
 					if (player != null)
 					{
-						if (!playerAttackers.Contains(player))
-							playerAttackers.Add(player);
-
-						if (player.Group != null)
+						if (!attackComponent.AttackerTracker.ContainsAttacker(player))
 						{
-							foreach (GamePlayer groupPlayer in player.Group.GetPlayersInTheGroup())
-							{
-								if (groupPlayer.IsWithinRadius(this, WorldMgr.MAX_EXPFORKILL_DISTANCE) && playerAttackers.Contains(groupPlayer) == false)
-									playerAttackers.Add(groupPlayer);
-							}
+							if (!playerAttackers.Contains(player))
+								playerAttackers.Add(player);
 						}
-					}
-					else
+
+						// Pet gets the killed message as well
 						livingAttacker.EnemyKilled(this);
+					}
 				}
 
-				foreach (GamePlayer player in playerAttackers)
-					player.EnemyKilled(this);
+				if (player != null)
+				{
+					if (!playerAttackers.Contains(player))
+						playerAttackers.Add(player);
 
-				foreach (Quests.DataQuest q in DataQuestList)
-					q.Notify(GameLivingEvent.Dying, this, new DyingEventArgs(killer, playerAttackers));
-
-				attackComponent.AttackerTracker.Clear();
-
-				// clear all of our targets
-				rangeAttackComponent.AutoFireTarget = null;
-				TargetObject = null;
-
-				// cancel all left effects
-				EffectList.CancelAll();
-				effectListComponent.CancelAll();
-
-				// Stop the regeneration timers
-				StopHealthRegeneration();
-				StopPowerRegeneration();
-				StopEnduranceRegeneration();
-
-				//Reduce health to zero
-				Health = 0;
-
-				// Remove all last attacked times
-				LastAttackedByEnemyTickPvE = 0;
-				LastAttackedByEnemyTickPvP = 0;
-
-				//Let's send the notification at the end
-				Notify(GameLivingEvent.Dying, this, new DyingEventArgs(killer));
+					if (player.Group != null)
+					{
+						foreach (GamePlayer groupPlayer in player.Group.GetPlayersInTheGroup())
+						{
+							if (groupPlayer.IsWithinRadius(this, WorldMgr.MAX_EXPFORKILL_DISTANCE) && playerAttackers.Contains(groupPlayer) == false)
+								playerAttackers.Add(groupPlayer);
+						}
+					}
+				}
+				else
+					livingAttacker.EnemyKilled(this);
 			}
-			finally
-			{
-				IsBeingHandledByReaperService = false;
-			}
+
+			foreach (GamePlayer player in playerAttackers)
+				player.EnemyKilled(this);
+
+			foreach (Quests.DataQuest q in DataQuestList)
+				q.Notify(GameLivingEvent.Dying, this, new DyingEventArgs(killer, playerAttackers));
+
+			attackComponent.AttackerTracker.Clear();
+
+			// clear all of our targets
+			rangeAttackComponent.AutoFireTarget = null;
+			TargetObject = null;
+
+			// cancel all left effects
+			EffectList.CancelAll();
+			effectListComponent.CancelAll();
+
+			// Stop the regeneration timers
+			StopHealthRegeneration();
+			StopPowerRegeneration();
+			StopEnduranceRegeneration();
+
+			//Reduce health to zero
+			Health = 0;
+
+			// Remove all last attacked times
+			LastAttackedByEnemyTickPvE = 0;
+			LastAttackedByEnemyTickPvP = 0;
+
+			//Let's send the notification at the end
+			Notify(GameLivingEvent.Dying, this, new DyingEventArgs(killer));
 		}
 
 		public void GainExperience(eXPSource xpSource, long exp, bool allowMultiply = false)
@@ -2407,23 +2384,25 @@ namespace DOL.GS
 			eProperty.Resist_Matter,
 			eProperty.Resist_Spirit
 		};
+
 		/// <summary>
 		/// gets the resistance value by damage type, refer to eDamageType for constants
 		/// </summary>
 		/// <param name="damageType"></param>
 		/// <returns></returns>
-		public virtual eProperty GetResistTypeForDamage(eDamageType damageType)
+		public static eProperty GetResistTypeForDamage(eDamageType damageType)
 		{
-			if ((int)damageType < m_damageTypeToResistBonusConversion.Length)
-			{
+			if ((int) damageType < m_damageTypeToResistBonusConversion.Length)
 				return m_damageTypeToResistBonusConversion[(int)damageType];
-			}
 			else
 			{
-				log.ErrorFormat("No resist found for damage type {0} on living {1}!", (int)damageType, Name);
+				if (log.IsErrorEnabled)
+					log.ErrorFormat($"No resist found for damage type {damageType}");
+
 				return 0;
 			}
 		}
+
 		/// <summary>
 		/// gets the resistance value by damage types
 		/// </summary>
@@ -2513,12 +2492,7 @@ namespace DOL.GS
 		/// </summary>
 		public virtual void StartHealthRegeneration()
 		{
-			if (!IsAlive || ObjectState is not eObjectState.Active)
-				return;
-
-			if (m_healthRegenerationTimer == null)
-				m_healthRegenerationTimer = new(this, new ECSGameTimer.ECSTimerCallback(HealthRegenerationTimerCallback));
-			else if (m_healthRegenerationTimer.IsAlive)
+			if (m_health == 0 || ObjectState is not eObjectState.Active || m_healthRegenerationTimer.IsAlive)
 				return;
 
 			m_healthRegenerationTimer.Start(GetHealthRegenerationInterval());
@@ -2539,7 +2513,7 @@ namespace DOL.GS
 		/// </summary>
 		public virtual void StopHealthRegeneration()
 		{
-			m_healthRegenerationTimer?.Stop();
+			m_healthRegenerationTimer.Stop();
 		}
 
 		/// <summary>
@@ -2547,7 +2521,7 @@ namespace DOL.GS
 		/// </summary>
 		public virtual void StopPowerRegeneration()
 		{
-			m_powerRegenerationTimer?.Stop();
+			m_powerRegenerationTimer.Stop();
 		}
 
 		/// <summary>
@@ -2555,7 +2529,7 @@ namespace DOL.GS
 		/// </summary>
 		public virtual void StopEnduranceRegeneration()
 		{
-			m_enduRegenerationTimer?.Stop();
+			m_enduRegenerationTimer.Stop();
 		}
 
 		protected virtual int HealthRegenerationTimerCallback(ECSGameTimer callingTimer)
@@ -2582,7 +2556,7 @@ namespace DOL.GS
 		{
 			int maxMana = MaxMana;
 
-			if (IsVampiirOrMauler())
+			if (IsVampiirOrMauler(this))
 			{
 				double onePercMana = Math.Ceiling(maxMana * 0.01);
 
@@ -2605,9 +2579,9 @@ namespace DOL.GS
 
 			return GetPowerRegenerationInterval();
 
-			bool IsVampiirOrMauler()
+			static bool IsVampiirOrMauler(GameLiving living)
 			{
-				if (this is not GamePlayer player)
+				if (living is not GamePlayer player)
 					return false;
 
 				eCharacterClass characterClass = (eCharacterClass) player.CharacterClass.ID;
@@ -2684,7 +2658,7 @@ namespace DOL.GS
 				else
 					m_health = Math.Max(0, value);
 
-				if (IsAlive && m_health < maxHealth)
+				if (m_health < maxHealth)
 					StartHealthRegeneration();
 			}
 		}
@@ -2699,7 +2673,7 @@ namespace DOL.GS
 				int maxMana = MaxMana;
 				m_mana = Math.Clamp(value, 0, maxMana);
 
-				if (IsAlive && (m_mana < maxMana || IsSpecialClass(this as GamePlayer)))
+				if (m_mana < maxMana || IsSpecialClass(this as GamePlayer))
 					StartPowerRegeneration();
 
 				static bool IsSpecialClass(GamePlayer player)
@@ -2724,7 +2698,7 @@ namespace DOL.GS
 				int maxEndurance = MaxEndurance;
 				m_endurance = Math.Clamp(value, 0, maxEndurance);
 
-				if (IsAlive && m_endurance < maxEndurance)
+				if (m_endurance < maxEndurance)
 					StartEnduranceRegeneration();
 			}
 		}
@@ -2743,7 +2717,13 @@ namespace DOL.GS
 
 			// Cancel all active conc spell effects from other casters.
 			foreach (ECSGameSpellEffect effect in effectListComponent.GetSpellEffects().Where(e => e.IsConcentrationEffect()))
-				effect.Stop(false);
+				effect.End(false);
+		}
+
+		public override void Delete()
+		{
+			effectListComponent.CancelAll();
+			base.Delete();
 		}
 
 		#endregion
@@ -2752,7 +2732,7 @@ namespace DOL.GS
 		/// <summary>
 		/// Holds the Living's Coordinate inside the current Region
 		/// </summary>
-		protected Point3D m_groundTarget;
+		public GroundTarget GroundTarget { get; } = new();
 
 		/// <summary>
 		/// Gets or sets the target of this living
@@ -2764,23 +2744,22 @@ namespace DOL.GS
 			get { return false; }
 			set { }
 		}
-		/// <summary>
-		/// Gets the Living's ground-target Coordinate inside the current Region
-		/// </summary>
-		public virtual Point3D GroundTarget
+
+		public void SetGroundTarget(int x, int y, int z)
 		{
-			get { return m_groundTarget; }
+			if (!CanSetGroundTarget())
+				return;
+
+			GroundTarget.Set(x, y, z);
+			OnGroundTargetSet();
 		}
 
-		/// <summary>
-		/// Sets the Living's ground-target Coordinates inside the current Region
-		/// </summary>
-		public virtual void SetGroundTarget(int groundX, int groundY, int groundZ)
+		protected virtual bool CanSetGroundTarget()
 		{
-			m_groundTarget.X = groundX;
-			m_groundTarget.Y = groundY;
-			m_groundTarget.Z = groundZ;
+			return true;
 		}
+
+		protected virtual void OnGroundTargetSet() { }
 
 		/// <summary>
 		/// Gets or Sets the current level of the Object
@@ -3475,7 +3454,7 @@ namespace DOL.GS
 				KeyValuePair<int, Type> key = new(skill.ID, skill.GetType());
 
 				if (duration > 0)
-					m_disabledSkills[key] = new KeyValuePair<long, Skill>(GameLoop.GameLoopTime + duration, skill);
+					m_disabledSkills[key] = new(GameLoop.GameLoopTime + duration, skill);
 				else
 					m_disabledSkills.Remove(key);
 			}
@@ -3488,17 +3467,19 @@ namespace DOL.GS
 		/// <param name="duration">duration of disable in milliseconds</param>
 		public virtual void DisableSkills(ICollection<Tuple<Skill, int>> skills)
 		{
+			if (skills.Count == 0)
+				return;
+
 			lock (_disabledSkillsLock)
 			{
 				foreach (Tuple<Skill, int> tuple in skills)
 				{
 					Skill skill = tuple.Item1;
 					int duration = tuple.Item2;
-					
 					KeyValuePair<int, Type> key = new(skill.ID, skill.GetType());
 
 					if (duration > 0)
-						m_disabledSkills[key] = new KeyValuePair<long, Skill>(GameLoop.GameLoopTime + duration, skill);
+						m_disabledSkills[key] = new(GameLoop.GameLoopTime + duration, skill);
 					else
 						m_disabledSkills.Remove(key);
 				}
@@ -3562,12 +3543,6 @@ namespace DOL.GS
 			StopHealthRegeneration();
 			StopPowerRegeneration();
 			StopEnduranceRegeneration();
-			m_healthRegenerationTimer?.Stop();
-			m_powerRegenerationTimer?.Stop();
-			m_enduRegenerationTimer?.Stop();
-			m_healthRegenerationTimer = null;
-			m_powerRegenerationTimer = null;
-			m_enduRegenerationTimer = null;
 			TargetObject = null;
 			return true;
 		}
@@ -3636,16 +3611,9 @@ namespace DOL.GS
 			castingComponent.InterruptCasting(IsMoving);
 		}
 
-		public virtual bool CastSpell(Spell spell, SpellLine line, ISpellCastingAbilityHandler spellCastingAbilityHandler = null)
+		public virtual bool CastSpell(Spell spell, SpellLine line, ISpellCastingAbilityHandler spellCastingAbilityHandler = null, bool checkLos = true)
 		{
-			return castingComponent.RequestCastSpell(spell, line, spellCastingAbilityHandler, TargetObject as GameLiving);
-		}
-
-		// Should only be used when the target of the spell is different than the currently selected one.
-		// Which can happen during LoS checks, since we're not waiting for the check to complete to perform other actions.
-		protected bool CastSpell(Spell spell, SpellLine line, GameLiving target, ISpellCastingAbilityHandler spellCastingAbilityHandle = null)
-		{
-			return castingComponent.RequestCastSpell(spell, line, spellCastingAbilityHandle, target);
+			return castingComponent.RequestCastSpell(spell, line, spellCastingAbilityHandler, TargetObject as GameLiving, checkLos);
 		}
 
 		public virtual bool CastSpell(ISpellCastingAbilityHandler ab)
@@ -3835,11 +3803,10 @@ namespace DOL.GS
 			rangeAttackComponent = new RangeAttackComponent(this);
 			styleComponent = StyleComponent.Create(this);
 			castingComponent = CastingComponent.Create(this);
-			effectListComponent = new EffectListComponent(this);
+			effectListComponent = EffectListComponent.Create(this);
 			movementComponent = MovementComponent.Create(this);
 
 			m_guildName = string.Empty;
-			m_groundTarget = new Point3D(0, 0, 0);
 
 			//Set all combat properties
 			m_activeWeaponSlot = eActiveWeaponSlot.Standard;
@@ -3851,6 +3818,10 @@ namespace DOL.GS
 			m_health = 1;
 			m_mana = 1;
 			m_endurance = 1;
+
+			m_healthRegenerationTimer = new(this, HealthRegenerationTimerCallback);
+			m_powerRegenerationTimer = new(this, PowerRegenerationTimerCallback);
+			m_enduRegenerationTimer = new(this, EnduranceRegenerationTimerCallback);
 		}
 	}
 }

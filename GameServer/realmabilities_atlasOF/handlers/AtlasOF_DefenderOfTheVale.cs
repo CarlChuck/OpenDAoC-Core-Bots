@@ -38,7 +38,7 @@ namespace DOL.GS.RealmAbilities
             m_dbspell.ClientEffect = 11253;
             m_dbspell.Damage = 50;
             m_dbspell.DamageType = 11;
-            m_dbspell.Target = "Group";
+            m_dbspell.Target = eSpellTarget.GROUP.ToString();
             m_dbspell.Radius = 1500;
             m_dbspell.Type = eSpellType.AblativeArmor.ToString();
             m_dbspell.Value = 500;
@@ -75,7 +75,7 @@ namespace DOL.GS.RealmAbilities
                 {
                     foreach (var living in target.Group.GetMembersInTheGroup())
                     {
-                        if (target.GetDistance(new Point2D(living.X, living.Y))  > m_spell.Radius) 
+                        if (target.IsWithinRadius(living, m_spell.Radius))
                             targets.Add(living);
                     }
                 }

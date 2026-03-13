@@ -6,6 +6,7 @@ using DOL.Events;
 using DOL.GS;
 using DOL.GS.Effects;
 using DOL.GS.PacketHandler;
+using DOL.GS.PlayerClass;
 
 namespace DOL.GS.Spells
 {
@@ -66,7 +67,7 @@ namespace DOL.GS.Spells
 			dbs.ClientEffect = 7312;
 			dbs.Damage = spell.Damage;
 			dbs.DamageType = (int)spell.DamageType;
-			dbs.Target = "Enemy";
+			dbs.Target = eSpellTarget.ENEMY.ToString();
 			dbs.Radius = 0;
 			dbs.Type = eSpellType.Prescience.ToString();
 			dbs.Value = spell.Value;
@@ -121,7 +122,7 @@ namespace DOL.GS.Spells
 			: base(caster, spell, line)
 		{
 			//Construct a new mine.
-			mine = new GameMine();
+			mine = new(new BlankBrain());
 			mine.Model = 2590;
 			mine.Name = spell.Name;
 			mine.Realm = caster.Realm;
@@ -130,7 +131,7 @@ namespace DOL.GS.Spells
 			mine.Z = caster.Z;
 			mine.CurrentRegionID = caster.CurrentRegionID;
 			mine.Heading = caster.Heading;
-			mine.Owner = (GamePlayer)caster;
+			mine.Owner = caster;
 
 			// Construct the mine spell
 			dbs = new DbSpell();
@@ -139,7 +140,7 @@ namespace DOL.GS.Spells
 			dbs.ClientEffect = 7313;
 			dbs.Damage = spell.Damage;
 			dbs.DamageType = (int)spell.DamageType;
-			dbs.Target = "Enemy";
+			dbs.Target = eSpellTarget.ENEMY.ToString();
 			dbs.Radius = 0;
 			dbs.Type = eSpellType.PowerRend.ToString();
 			dbs.Value = spell.Value;
@@ -190,7 +191,7 @@ namespace DOL.GS.Spells
 			dbs.ClientEffect = 7237;
 			dbs.Damage = spell.Damage;
 			dbs.DamageType = (int)spell.DamageType;
-			dbs.Target = "Enemy";
+			dbs.Target = eSpellTarget.ENEMY.ToString();
 			dbs.Radius = 0;
 			dbs.Type = eSpellType.SpeedWrap.ToString();
 			dbs.Value = spell.Value;
@@ -299,7 +300,7 @@ namespace DOL.GS.Spells
 			if ((effect.Owner is GamePlayer))
 			{
 				GamePlayer casterPlayer = effect.Owner as GamePlayer;
-				if (casterPlayer.GroundTarget != null && casterPlayer.GroundTargetInView)
+				if (casterPlayer.GroundTarget.IsValid && casterPlayer.GroundTargetInView)
 				{
 					GameEventMgr.AddHandler(casterPlayer, GamePlayerEvent.Moving, new DOLEventHandler(PlayerMoves));
 					GameEventMgr.AddHandler(warder, GameLivingEvent.Dying, new DOLEventHandler(BattleWarderDie));
@@ -366,7 +367,7 @@ namespace DOL.GS.Spells
 		public override bool CheckBeginCast(GameLiving selectedTarget)
 		{
 			if (!base.CheckBeginCast(selectedTarget)) return false;
-			if (!(m_caster.GroundTarget != null && m_caster.GroundTargetInView))
+			if (!(m_caster.GroundTarget.IsValid && m_caster.GroundTargetInView))
 			{
 				MessageToCaster("Your area target is out of range.  Set a closer ground position.", eChatType.CT_SpellResisted);
 				return false;
@@ -402,7 +403,7 @@ namespace DOL.GS.Spells
 			: base(caster, spell, line)
 		{
 			//Construct a new mine.
-			mine = new GameMine();
+			mine = new(new BlankBrain());
 			mine.Model = 2588;
 			mine.Name = spell.Name;
 			mine.Realm = caster.Realm;
@@ -411,7 +412,7 @@ namespace DOL.GS.Spells
 			mine.Z = caster.Z;
 			mine.CurrentRegionID = caster.CurrentRegionID;
 			mine.Heading = caster.Heading;
-			mine.Owner = (GamePlayer)caster;
+			mine.Owner = caster;
 
 			// Construct the mine spell
 			dbs = new DbSpell();
@@ -420,7 +421,7 @@ namespace DOL.GS.Spells
 			dbs.ClientEffect = 7255;
 			dbs.Damage = spell.Damage;
 			dbs.DamageType = (int)spell.DamageType;
-			dbs.Target = "Enemy";
+			dbs.Target = eSpellTarget.ENEMY.ToString();
 			dbs.Radius = 0;
 			dbs.Type = eSpellType.DirectDamage.ToString();
 			dbs.Value = spell.Value;
@@ -556,8 +557,8 @@ namespace DOL.GS.Spells
 
 			// Add byNefa 04.02.2011 13:35
 			// Check if Necro try to use ML9 Convoker at own Pet
-			if  (m_player != null && m_player.CharacterClass.ID == (int)eCharacterClass.Necromancer)
-			{ // Caster is a Necro
+			if  (m_player != null && m_player.CharacterClass is ClassDisciple)
+			{
 				NecromancerPet necroPet = target as NecromancerPet;
 				if (necroPet == null || necroPet.Owner == m_player)
 				{ // Caster is a Nekro and his Target is his Own Pet
@@ -690,25 +691,21 @@ namespace DOL.GS.Spells
 			z = Caster.Z;
 			if (Spell.Target == eSpellTarget.AREA)
 			{
-				if (Caster.GroundTargetInView && Caster.GroundTarget != null)
+				if (!Caster.GroundTarget.IsValid)
 				{
-					x = Caster.GroundTarget.X;
-					y = Caster.GroundTarget.Y;
-					z = Caster.GroundTarget.Z;
+					MessageToCaster("You must set a groundtarget!", eChatType.CT_SpellResisted);
+					return false;
 				}
-				else
+
+				if (!Caster.GroundTargetInView)
 				{
-					if (Caster.GroundTarget == null)
-					{
-						MessageToCaster("You must set a groundtarget!", eChatType.CT_SpellResisted);
-						return false;
-					}
-					else
-					{
-						MessageToCaster("Your area target is not in view.", eChatType.CT_SpellResisted);
-						return false;
-					}
+					MessageToCaster("Your area target is not in view.", eChatType.CT_SpellResisted);
+					return false;
 				}
+
+				x = Caster.GroundTarget.X;
+				y = Caster.GroundTarget.Y;
+				z = Caster.GroundTarget.Z;
 			}
 			return true;
 		}
@@ -873,7 +870,7 @@ public class MLBrain : GuardBrain
 			if (!(npc.Brain is IControlledBrain || npc is GameGuard))
 				continue;
 
-			AddToAggroList(npc, npc.Level << 1);
+			AddToAggroList(npc);
 			return;
 		}
 	}

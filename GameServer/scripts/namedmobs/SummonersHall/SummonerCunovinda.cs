@@ -266,11 +266,10 @@ namespace DOL.AI.Brain
 					spell.Name = "Summoner Bolt";
 					spell.Range = 1800;
 					spell.SpellID = 11761;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Uninterruptible = true;
 					spell.Type = eSpellType.Bolt.ToString();
 					m_CunovindaBolt = new Spell(spell, 50);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_CunovindaBolt);
 				}
 				return m_CunovindaBolt;
 			}

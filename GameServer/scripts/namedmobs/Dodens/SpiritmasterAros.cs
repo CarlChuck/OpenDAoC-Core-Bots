@@ -1,10 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using DOL.AI.Brain;
 using DOL.Database;
-using DOL.GS.PacketHandler;
 using DOL.Events;
 using DOL.GS;
-using System.Collections.Generic;
+using DOL.GS.PacketHandler;
+using DOL.GS.PlayerClass;
 
 namespace DOL.GS
 {
@@ -242,8 +243,8 @@ namespace DOL.AI.Brain
 			{
 				foreach (GamePlayer player in Body.GetPlayersInRadius(2000))
 				{
-					if (player != null && player.IsAlive && player.Client.Account.PrivLevel == 1 && player.CharacterClass.ID != (int)eCharacterClass.Necromancer)
-						{
+					if (player != null && player.IsAlive && player.Client.Account.PrivLevel == 1 && player.CharacterClass is not ClassDisciple)
+					{
 						if (!Enemys_To_Debuff.Contains(player))
 							Enemys_To_Debuff.Add(player);
 					}
@@ -288,11 +289,10 @@ namespace DOL.AI.Brain
 					spell.Name = "Extinguish Lifeforce";
 					spell.Range = 1500;
 					spell.SpellID = 11916;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					m_Aros_DD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Aros_DD);
 				}
 				return m_Aros_DD;
 			}
@@ -317,11 +317,10 @@ namespace DOL.AI.Brain
 					spell.Range = 0;
 					spell.Radius = 800;
 					spell.SpellID = 11917;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					m_Aros_Bomb = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Aros_Bomb);
 				}
 				return m_Aros_Bomb;
 			}
@@ -347,13 +346,12 @@ namespace DOL.AI.Brain
 					spell.Range = 1500;
 					spell.Radius = 500;
 					spell.SpellID = 11918;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.SpiritResistDebuff.ToString();
 					spell.Message1 = "You feel more vulnerable to spirit magic!";
 					spell.Message2 = "{0} seems vulnerable to spirit magic!";
 					spell.Uninterruptible = true;
 					m_Aros_Debuff = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Aros_Debuff);
 				}
 				return m_Aros_Debuff;
 			}
@@ -470,10 +468,9 @@ namespace DOL.GS
 					spell.Name = "Stun";
 					spell.Range = 400;
 					spell.SpellID = 11915;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.Stun.ToString();
 					m_SpiritChampion_stun = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_SpiritChampion_stun);
 				}
 				return m_SpiritChampion_stun;
 			}

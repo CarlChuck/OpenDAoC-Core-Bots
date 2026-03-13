@@ -95,13 +95,12 @@ namespace DOL.GS
 					spell.Range = 600;
 					spell.Radius = 350;
 					spell.SpellID = 11816;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "DamageSpeedDecrease";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Matter;
 					m_HurjavelenDD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_HurjavelenDD);
 				}
 				return m_HurjavelenDD;
 			}
@@ -175,13 +174,12 @@ namespace DOL.AI.Brain
 					spell.Range = 0;
 					spell.Duration = 120;
 					spell.SpellID = 11816;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "Disease";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Energy; //Energy DMG Type
 					m_HurjavelenDisease = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_HurjavelenDisease);
 				}
 				return m_HurjavelenDisease;
 			}

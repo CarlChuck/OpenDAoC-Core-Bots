@@ -25,11 +25,18 @@ namespace DOL.GS.RealmAbilities
 				return;
 			}
 
-            if ( caster.GroundTarget == null || !caster.IsWithinRadius( caster.GroundTarget, 1500 ) )
+            if (!caster.GroundTarget.IsValid)
             {
-				caster.Out.SendMessage("You groundtarget is too far away to use this ability!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
-				return;
+                caster.Out.SendMessage("You must set a ground target to use this ability!", eChatType.CT_System, eChatLoc.CL_SystemWindow );
+                return;
             }
+
+            if (!caster.IsWithinRadius(caster.GroundTarget, 1500))
+            {
+                caster.Out.SendMessage("Your ground target is too far away to use this ability!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+                return;
+            }
+
             if (caster.TempProperties.GetProperty<bool>(IS_CASTING))
             {
                 caster.Out.SendMessage("You are already casting an ability.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
@@ -99,7 +106,7 @@ namespace DOL.GS.RealmAbilities
             // GameEventMgr.RemoveHandler(player, GamePlayerEvent.Moving, new DOLEventHandler(CastInterrupted));
             GameEventMgr.RemoveHandler(player, GamePlayerEvent.AttackFinished, new DOLEventHandler(CastInterrupted));
             GameEventMgr.RemoveHandler(player, GamePlayerEvent.Dying, new DOLEventHandler(CastInterrupted));
-            if (player.IsMezzed || player.IsStunned || player.IsSitting)
+            if (player.IsCrowdControlled || player.IsSitting)
                 return 0;
             if (!castWasSuccess)
                 return 0;

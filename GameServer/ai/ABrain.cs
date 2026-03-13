@@ -11,10 +11,10 @@ namespace DOL.AI
     public abstract class ABrain : IServiceObject
     {
         public FSM FSM { get; set; }
-        public ServiceObjectId ServiceObjectId { get; set; } = new(ServiceObjectType.Brain);
+        public ServiceObjectId ServiceObjectId { get; } = new(ServiceObjectType.Brain);
         public virtual GameNPC Body { get; set; }
         public virtual int ThinkInterval { get; set; } = 2500;
-        public bool IsActive => Body != null && Body.IsAlive && Body.ObjectState == GameObject.eObjectState.Active && Body.IsVisibleToPlayers;
+        public bool IsActive => Body != null && Body.IsAlive && Body.ObjectState is GameObject.eObjectState.Active && Body.IsVisibleToPlayers;
         public long NextThinkTick { get; set; }
         protected virtual int ThinkOffsetOnStart => Util.Random(750, 3000);
 
@@ -58,10 +58,8 @@ namespace DOL.AI
             if (ServiceObjectId.IsPendingRemoval)
                 return false; // Prevents overrides from doing any redundant work. Maybe counter intuitive.
 
-            bool wasReturningToSpawnPoint = Body.IsReturningToSpawnPoint;
-
             // Without `IsActive` check, charming a NPC that's returning to spawn would teleport it.
-            if (wasReturningToSpawnPoint && !IsActive)
+            if (!Body.IsNearSpawn && !IsActive)
                 Body.MoveTo(Body.CurrentRegionID, Body.SpawnPoint.X, Body.SpawnPoint.Y, Body.SpawnPoint.Z, Body.SpawnHeading);
 
             Body.ClearObjectsInRadiusCache();

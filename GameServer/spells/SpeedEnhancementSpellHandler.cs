@@ -12,9 +12,10 @@ namespace DOL.GS.Spells
 	[SpellHandler(eSpellType.SpeedEnhancement)]
 	public class SpeedEnhancementSpellHandler : SpellHandler
 	{
-		/// <summary>
-		/// called after normal spell cast is completed and effect has to be started
-		/// </summary>
+		public override string ShortDescription => $"The target's speed is increased to {Spell.Value}% of normal.";
+
+		public SpeedEnhancementSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
+
 		public override void FinishSpellCast(GameLiving target)
 		{
 			Caster.Mana -= PowerCost(target);
@@ -23,7 +24,7 @@ namespace DOL.GS.Spells
 
 		public override ECSGameSpellEffect CreateECSEffect(in ECSGameEffectInitParams initParams)
 		{
-			return ECSGameEffectFactory.Create(initParams, static (in ECSGameEffectInitParams i) => new SpeedEnhancementECSEffect(i));
+			return ECSGameEffectFactory.Create(initParams, static (in i) => new SpeedEnhancementECSEffect(i));
 		}
 
 		protected override int CalculateEffectDuration(GameLiving target)
@@ -36,7 +37,7 @@ namespace DOL.GS.Spells
 				if (instrument != null)
 				{
 					duration *= 1.0 + Math.Min(1.0, instrument.Level / (double)Caster.Level); // up to 200% duration for songs
-					duration *= instrument.Condition / (double)instrument.MaxCondition * instrument.Quality / 100;
+					duration *= instrument.Quality * 0.01 * instrument.ConditionPercent * 0.01;
 				}
 			}
 			
@@ -105,13 +106,5 @@ namespace DOL.GS.Spells
 				return list;
 			}
 		}
-
-		/// <summary>
-		/// The spell handler constructor
-		/// </summary>
-		/// <param name="caster"></param>
-		/// <param name="spell"></param>
-		/// <param name="line"></param>
-		public SpeedEnhancementSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
 	}
 }

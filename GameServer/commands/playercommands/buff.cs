@@ -142,8 +142,8 @@ namespace DOL.GS.Commands
                 buffKeys = _buffLookupTable.Keys.ToArray();
 
             List<(Spell, SpellLine)> buffsToCast = new(buffKeys.Length);
-            List<Tuple<Skill, Skill>> useableSkills = client.Player.GetAllUsableSkills();
-            List<Tuple<SpellLine, List<Skill>>> useableLists = client.Player.GetAllUsableListSpells();
+            List<(Skill, Skill)> useableSkills = client.Player.GetAllUsableSkills();
+            List<(SpellLine, List<Skill>)> useableLists = client.Player.GetAllUsableListSpells();
 
             foreach (string buffKey in buffKeys)
             {
@@ -155,7 +155,7 @@ namespace DOL.GS.Commands
                     continue;
                 }
 
-                foreach (Tuple<Skill, Skill> useableSkill in useableSkills)
+                foreach ((Skill, Skill) useableSkill in useableSkills)
                 {
                     Spell useableSpell = useableSkill.Item1 as Spell;
 
@@ -163,7 +163,7 @@ namespace DOL.GS.Commands
                         strongestSpell = (useableSpell, useableSkill.Item2 as SpellLine);
                 }
 
-                foreach (Tuple<SpellLine, List<Skill>> useableList in useableLists)
+                foreach ((SpellLine, List<Skill>) useableList in useableLists)
                 {
                     foreach (Skill useableSkill in useableList.Item2)
                     {
@@ -217,7 +217,7 @@ namespace DOL.GS.Commands
                 }
 
                 // The radius should be large enough for players to be able to cast from outside.
-                AbstractGameKeep keep = GameServer.KeepManager.GetKeepCloseToSpot(client.Player.CurrentRegionID, client.Player, 2500);
+                AbstractGameKeep keep = GameServer.KeepManager.GetClosestKeepToSpot(client.Player.CurrentRegionID, client.Player, 2500);
 
                 if (keep != null && keep.IsPortalKeep)
                     return true;
@@ -232,7 +232,7 @@ namespace DOL.GS.Commands
                     spell.SpellType != buffType ||
                     spell.IsPulsing ||
                     spell.RecastDelay > 0 ||
-                    (!spell.IsConcentration && spell.Duration <= 300))
+                    (!spell.IsConcentration && spell.Duration <= 300000))
                 {
                     return false;
                 }
@@ -311,11 +311,13 @@ namespace DOL.GS.Commands
             if (buffCommandSpell == null)
                 return;
 
-            foreach ((Spell, SpellLine) buff in buffCommandSpell.BuffsToCast)
+            foreach ((Spell spell, SpellLine spellLine) in buffCommandSpell.BuffsToCast)
             {
-                Spell clonedSpell = buff.Item1.Clone() as Spell;
+                Spell clonedSpell = spell.Clone() as Spell;
                 clonedSpell.CastTime = 0;
-                Caster.CastSpell(clonedSpell, buff.Item2);
+                SpellHandler spellHandler = ScriptMgr.CreateSpellHandler(Caster, clonedSpell, spellLine) as SpellHandler;
+                spellHandler.Target = target;
+                spellHandler.Tick();
             }
         }
     }

@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using DOL.AI;
 using DOL.AI.Brain;
 using DOL.Database;
 using DOL.GS.Effects;
@@ -50,7 +51,7 @@ namespace DOL.GS.Spells
                 {
                     if (spell.Radius > 0)
                     {
-                        foreach (GamePlayer player in WorldMgr.GetPlayersCloseToSpot(caster.CurrentRegionID, caster.GroundTarget.X, caster.GroundTarget.Y, caster.GroundTarget.Z, (ushort) spell.Radius))
+                        foreach (GamePlayer player in WorldMgr.GetPlayersCloseToSpot(caster.CurrentRegionID, caster.GroundTarget, (ushort) spell.Radius))
                         {
                             if (GameServer.ServerRules.IsAllowedToAttack(caster, player, true))
                                 list.Add(player);
@@ -192,7 +193,7 @@ namespace DOL.GS.Spells
             get
             {
                 var list = new List<string>();
-                list.Add(Spell.Description);
+                list.Add(ShortDescription);
                 return list;
             }
         }
@@ -258,7 +259,7 @@ namespace DOL.GS.Spells
             get
             {
                 var list = new List<string>();
-                list.Add(Spell.Description);
+                list.Add(ShortDescription);
                 return list;
             }
         }
@@ -306,7 +307,7 @@ namespace DOL.GS.Spells
             get
             {
                 var list = new List<string>();
-                list.Add(Spell.Description);
+                list.Add(ShortDescription);
                 return list;
             }
         }
@@ -355,7 +356,7 @@ namespace DOL.GS.Spells
             get
             {
                 var list = new List<string>();
-                list.Add(Spell.Description);
+                list.Add(ShortDescription);
                 return list;
             }
         }
@@ -427,7 +428,7 @@ namespace DOL.GS.Spells
             get
             {
                 var list = new List<string>();
-                list.Add(Spell.Description);
+                list.Add(ShortDescription);
                 return list;
             }
         }
@@ -720,9 +721,8 @@ namespace DOL.GS
     #region Decoy
     public class GameDecoy : GameNPC
     {
-        public GameDecoy()
+        public GameDecoy() : base(new BlankBrain())
         {
-            SetOwnBrain(new BlankBrain());
             this.MaxSpeedBase = 0;
         }
         public override void Die(GameObject killer)
@@ -746,9 +746,8 @@ namespace DOL.GS
     #region Gamefont
     public class GameFont : GameMovingObject
     {
-        public GameFont()
+        public GameFont() : base(new BlankBrain())
         {
-            SetOwnBrain(new BlankBrain());
             this.Realm = 0;
             this.Level = 1;
             this.MaxSpeedBase = 0;
@@ -803,53 +802,25 @@ namespace DOL.GS
     #region Gametrap
     public class GameMine : GameMovingObject
     {
-        public GameMine()
+        public GameLiving Owner { get; set; }
+
+        public GameMine(ABrain defaultBrain) : base(defaultBrain)
         {
-            this.Realm = 0;
-            this.Level = 1;
-            this.Health = this.MaxHealth;
-            this.MaxSpeedBase = 0;
+            Realm = 0;
+            Level = 1;
+            Health = MaxHealth;
+            MaxSpeedBase = 0;
         }
 
-        private GamePlayer m_owner;
-        public GamePlayer Owner
-        {
-            get { return m_owner; }
-            set { m_owner = value; }
-        }
-        public virtual int CalculateToHitChance(GameLiving target)
-        {
-            int spellLevel = m_owner.Level;
-            GameLiving caster = m_owner as GameLiving;
-            int spellbonus = m_owner.GetModified(eProperty.SpellLevel);
-            spellLevel += spellbonus;
-            if (spellLevel > 50)
-                spellLevel = 50;
-            int hitchance = 85 + ((spellLevel - target.Level) / 2);
-            return hitchance;
-        }
-        public override void TakeDamage(GameObject source, eDamageType damageType, int damageAmount, int criticalAmount)
-        {
-            if (source is GamePlayer)
-            {
-                damageAmount = 0;
-                criticalAmount = 0;
-            }
-            if (Health - damageAmount - criticalAmount <= 0)
-                this.Delete();
-            else
-                Health = Health - damageAmount - criticalAmount;
-
-        }
+        public override void TakeDamage(GameObject source, eDamageType damageType, int damageAmount, int criticalAmount) { }
     }
     #endregion
 
     #region GameStorm
     public class GameStorm : GameMovingObject
     {
-        public GameStorm()
+        public GameStorm() : base(new BlankBrain())
         {
-            SetOwnBrain(new BlankBrain());
             this.Realm = 0;
             this.Level = 60;
             this.MaxSpeedBase = 191;

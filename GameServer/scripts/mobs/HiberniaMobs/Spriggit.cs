@@ -93,11 +93,10 @@ namespace DOL.AI.Brain
 					spell.Name = "Frost Blast";
 					spell.Range = 1500;
 					spell.SpellID = 11941;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					m_SpriggitDD = new Spell(spell, 20);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_SpriggitDD);
 				}
 				return m_SpriggitDD;
 			}
@@ -123,11 +122,10 @@ namespace DOL.AI.Brain
 					spell.Name = "Root";
 					spell.Range = 1500;
 					spell.SpellID = 11942;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.SpeedDecrease.ToString();
 					spell.Uninterruptible = true;
 					m_SpriggitRoot = new Spell(spell, 20);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_SpriggitRoot);
 				}
 				return m_SpriggitRoot;
 			}

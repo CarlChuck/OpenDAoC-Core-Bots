@@ -12,7 +12,7 @@ namespace DOL.GS
 
         private const bool DYNAMIC_BUSY_WAIT_THRESHOLD = true;
 
-        private long _tickDuration;
+        private double _tickDuration;
         private bool _running;
         private Thread _busyWaitThresholdThread;
         private int _busyWaitThreshold;
@@ -23,7 +23,7 @@ namespace DOL.GS
 
         public GameLoopTickPacerStats Stats { get; private set; }
 
-        public GameLoopTickPacer(long tickDuration)
+        public GameLoopTickPacer(double tickDuration)
         {
             if (tickDuration <= 0)
                 throw new ArgumentOutOfRangeException(nameof(tickDuration), "Tick duration must be a positive value.");
@@ -38,9 +38,9 @@ namespace DOL.GS
 
             _running = true;
 
-            if (DYNAMIC_BUSY_WAIT_THRESHOLD)
+            if (DYNAMIC_BUSY_WAIT_THRESHOLD && Environment.ProcessorCount > 1)
             {
-                _busyWaitThresholdThread = new Thread(new ThreadStart(UpdateBusyWaitThreshold))
+                _busyWaitThresholdThread = new(new ThreadStart(UpdateBusyWaitThreshold))
                 {
                     Name = $"{GameLoop.THREAD_NAME}_BusyWaitThreshold",
                     Priority = ThreadPriority.AboveNormal,
@@ -73,15 +73,13 @@ namespace DOL.GS
 
             if (sleepFor >= busyWaitThreshold)
                 Thread.Sleep(sleepFor - busyWaitThreshold);
-            else
-                Thread.Yield();
 
             if (_tickDuration > _stopwatch.Elapsed.TotalMilliseconds)
             {
-                SpinWait spinWait = new();
-
+                // Any small number will do here. Technically, this could be 0.
+                // If the game loop appears to overshoot the tick duration for no reason, this can be reduced even further.
                 while (_tickDuration > _stopwatch.Elapsed.TotalMilliseconds)
-                    spinWait.SpinOnce(-1);
+                    Thread.SpinWait(10);
             }
 
             double elapsedTime = _stopwatch.Elapsed.TotalMilliseconds;
@@ -120,7 +118,7 @@ namespace DOL.GS
                             highest = overSleptFor;
                     }
 
-                    _busyWaitThreshold = Math.Max(0, (int) highest);
+                    _busyWaitThreshold = (int) Math.Max(0, Math.Ceiling(highest));
                     Thread.Sleep(pauseFor);
                 }
             }

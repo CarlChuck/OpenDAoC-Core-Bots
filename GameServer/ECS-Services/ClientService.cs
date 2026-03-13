@@ -6,6 +6,8 @@ using DOL.Database;
 using DOL.GS.Housing;
 using DOL.GS.ServerProperties;
 using DOL.Logging;
+using DOL.Threading;
+using DOL.Timing;
 using ECS.Debug;
 
 namespace DOL.GS
@@ -19,7 +21,7 @@ namespace DOL.GS
 
         private List<GameClient> _clients = new();
         private SimpleDisposableLock _lock = new(LockRecursionPolicy.SupportsRecursion);
-        private int _lastValidIndex;
+        private int _lastValidIndex = -1;
         private int _clientCount;
         private GameClient[] _clientsBySessionId = new GameClient[ushort.MaxValue];
         private Trie<GamePlayer> _playerNameTrie = new();
@@ -92,19 +94,9 @@ namespace DOL.GS
 
                         CheckInGameActivityTimeout(client);
 
-                        // The client state might have been modified by an inbound packet.
-                        if (client.ClientState is not GameClient.eClientState.Playing || player.ObjectState is not GameObject.eObjectState.Active)
-                            break;
-
                         // The rate at which clients send `UDPInitRequestHandler` may vary depending on their version (1.127 = 65 seconds).
                         if (GameServiceUtils.ShouldTick(client.UdpPingTime + 70000))
                             client.UdpConfirm = false;
-
-                        if (GameServiceUtils.ShouldTick(player.NextWorldUpdate))
-                        {
-                            UpdateWorld(player);
-                            player.NextWorldUpdate = GameLoop.GameLoopTime + Properties.WORLD_PLAYER_UPDATE_INTERVAL;
-                        }
 
                         break;
                     }
@@ -130,8 +122,23 @@ namespace DOL.GS
                     case GameClient.eClientState.Connecting:
                     case GameClient.eClientState.CharScreen:
                     case GameClient.eClientState.WorldEnter:
+                    {
+                        Send(client);
+                        break;
+                    }
                     case GameClient.eClientState.Playing:
                     {
+                        GamePlayer player = client.Player;
+
+                        // The client state changes to WorldEnter in `WorldInitRequestHandler`, and to Playing in `GameOpenRequestHandler`
+                        // However, the change to `WorldInitRequestHandler` happens a little too late, and sending object updates during a loading screen can cause the client to crash.
+                        // For this reason, we also check the player's object state.
+                        if (player != null && client.Player.ObjectState is GameObject.eObjectState.Active && GameServiceUtils.ShouldTick(player.NextWorldUpdate))
+                        {
+                            UpdateWorld(player);
+                            player.NextWorldUpdate = GameLoop.GameLoopTime + Properties.WORLD_PLAYER_UPDATE_INTERVAL;
+                        }
+
                         Send(client);
                         break;
                     }
@@ -147,9 +154,9 @@ namespace DOL.GS
 
         private static void Receive(GameClient client)
         {
-            long startTick = GameLoop.GetRealTime();
+            long startTick = MonotonicTime.NowMs;
             client.Receive();
-            long stopTick = GameLoop.GetRealTime();
+            long stopTick = MonotonicTime.NowMs;
 
             if (stopTick - startTick > Diagnostics.LongTickThreshold)
                 log.Warn($"Long {Instance.ServiceName}.{nameof(Receive)} for {client.Account?.Name}({client.SessionID}) Time: {stopTick - startTick}ms");
@@ -157,9 +164,9 @@ namespace DOL.GS
 
         private static void Send(GameClient client)
         {
-            long startTick = GameLoop.GetRealTime();
+            long startTick = MonotonicTime.NowMs;
             client.PacketProcessor.SendPendingPackets();
-            long stopTick = GameLoop.GetRealTime();
+            long stopTick = MonotonicTime.NowMs;
 
             if (stopTick - startTick > Diagnostics.LongTickThreshold)
                 log.Warn($"Long {Instance.ServiceName}.{nameof(Send)} for {client.Account.Name}({client.SessionID}) Time: {stopTick - startTick}ms");
@@ -237,12 +244,22 @@ namespace DOL.GS
             {
                 _lock.EnterReadLock();
 
-                foreach (GameClient client in _clients)
+                for (int i = 0; i <= _lastValidIndex; i++)
                 {
+                    GameClient client = _clients[i];
+
                     if (client == null || !client.IsPlaying)
                         continue;
 
                     GamePlayer player = client.Player;
+
+                    if (player == null)
+                    {
+                        if (log.IsErrorEnabled)
+                            log.Error($"Client is playing but has no player. (Client: {client})");
+
+                        continue;
+                    }
 
                     if (action?.Invoke(player, actionArgument) != false)
                         return player;
@@ -270,12 +287,22 @@ namespace DOL.GS
             {
                 _lock.EnterReadLock();
 
-                foreach (GameClient client in _clients)
+                for (int i = 0; i <= _lastValidIndex; i++)
                 {
-                    if (client == null || !client.IsPlaying)
+                    GameClient client = _clients[i];
+
+                    if (!client.IsPlaying)
                         continue;
 
                     GamePlayer player = client.Player;
+
+                    if (player == null)
+                    {
+                        if (log.IsErrorEnabled)
+                            log.Error($"Client is playing but has no player. (Client: {client})");
+
+                        continue;
+                    }
 
                     if (action?.Invoke(player, actionArgument) != false)
                         players.Add(player);
@@ -296,9 +323,12 @@ namespace DOL.GS
             {
                 _lock.EnterReadLock();
 
-                foreach (GameClient client in _clients)
+                for (int i = 0; i <= _lastValidIndex; i++)
                 {
-                    if (client?.Account == null)
+                    GameClient client = _clients[i];
+
+                    // Most code assumes clients have an account for privilege checks.
+                    if (client.Account == null)
                         continue;
 
                     if (action?.Invoke(client, actionArgument) != false)
@@ -327,9 +357,12 @@ namespace DOL.GS
             {
                 _lock.EnterReadLock();
 
-                foreach (GameClient client in _clients)
+                for (int i = 0; i <= _lastValidIndex; i++)
                 {
-                    if (client?.Account == null)
+                    GameClient client = _clients[i];
+
+                    // Most code assumes clients have an account for privilege checks.
+                    if (client.Account == null)
                         continue;
 
                     if (action?.Invoke(client, actionArgument) != false)
@@ -539,7 +572,7 @@ namespace DOL.GS
 
             static bool Predicate(GameClient client, DbAccount account)
             {
-                return client.Account != null && client.Account == account;
+                return client.Account == account;
             }
         }
 
@@ -549,7 +582,7 @@ namespace DOL.GS
 
             static bool Predicate(GameClient client, string accountName)
             {
-                return client.Account != null && client.Account.Name.Equals(accountName);
+                return client.Account.Name.Equals(accountName, StringComparison.OrdinalIgnoreCase);
             }
         }
 
@@ -559,7 +592,7 @@ namespace DOL.GS
 
             static bool Predicate(GameClient client, GameClient otherClient)
             {
-                return client.Account != null && (ePrivLevel) client.Account.PrivLevel <= ePrivLevel.Player && client.TcpEndpointAddress.Equals(otherClient.TcpEndpointAddress) && client != otherClient;
+                return (ePrivLevel) client.Account.PrivLevel <= ePrivLevel.Player && client.TcpEndpointAddress.Equals(otherClient.TcpEndpointAddress) && client != otherClient;
             }
         }
 
@@ -743,7 +776,7 @@ namespace DOL.GS
         private static void UpdateWorld(GamePlayer player)
         {
             // Players aren't updated here on purpose.
-            long startTick = GameLoop.GetRealTime();
+            long startTick = MonotonicTime.NowMs;
 
             lock (player.PlayerObjectCache.NpcUpdateCacheLock)
             {
@@ -765,7 +798,7 @@ namespace DOL.GS
                 UpdateHouses(player);
             }
 
-            long stopTick = GameLoop.GetRealTime();
+            long stopTick = MonotonicTime.NowMs;
 
             if (stopTick - startTick > Diagnostics.LongTickThreshold)
                 log.Warn($"Long {Instance.ServiceName}.{nameof(UpdateWorld)} for {player.Name}({player.ObjectID}) Time: {stopTick - startTick}ms");

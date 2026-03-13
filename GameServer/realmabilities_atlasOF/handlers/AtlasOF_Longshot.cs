@@ -41,7 +41,7 @@ namespace DOL.GS.RealmAbilities
             foreach (ECSGameAbilityEffect effect in player.effectListComponent.GetAbilityEffects())
             {
                 if (effect.EffectType is eEffect.RapidFire or eEffect.SureShot or eEffect.Volley)
-                    effect.Stop();
+                    effect.End();
             }
 
             if (player.attackComponent.AttackState)
@@ -49,7 +49,7 @@ namespace DOL.GS.RealmAbilities
                 if (player.rangeAttackComponent.RangedAttackType is eRangedAttackType.Long)
                 {
                     player.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "Skill.Ability.CriticalShot.SwitchToRegular"), eChatType.CT_System, eChatLoc.CL_SystemWindow);
-                    EffectListService.GetAbilityEffectOnTarget(player, eEffect.TrueShot).Stop();
+                    EffectListService.GetAbilityEffectOnTarget(player, eEffect.TrueShot).End();
                 }
                 else
                     player.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "Skill.Ability.CriticalShot.AlreadyFiring"), eChatType.CT_Important, eChatLoc.CL_SystemWindow);
@@ -57,7 +57,7 @@ namespace DOL.GS.RealmAbilities
                 return;
             }
 
-            ECSGameEffectFactory.Create(new(player, 0, 1), this, static (in ECSGameEffectInitParams i, AtlasOF_Longshot longshot) => new AtlasOF_LongshotECSEffect(longshot, i));
+            ECSGameEffectFactory.Create(new(player, 0, 1), this, static (in i, longshot) => new AtlasOF_LongshotECSEffect(longshot, i));
         }
     }
 }

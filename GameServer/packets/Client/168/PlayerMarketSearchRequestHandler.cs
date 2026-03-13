@@ -1,41 +1,14 @@
-/*
- * DAWN OF LIGHT - The first free open source DAoC server emulator
- * 
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- * 
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
- *
- */
-using System;
 using System.Reflection;
-using System.Collections;
-using System.Collections.Generic;
-using DOL.Database;
-using DOL.GS.Housing;
-using System.Text;
+using DOL.Logging;
 
 namespace DOL.GS.PacketHandler.Client.v168
 {
 	[PacketHandlerAttribute(PacketHandlerType.TCP, eClientPackets.MarketSearchRequest, "Handles player market search", eClientStatus.PlayerInGame)]
-	public class PlayerMarketSearchRequestHandler : IPacketHandler
+	public class PlayerMarketSearchRequestHandler : PacketHandler
 	{
-		/// <summary>
-		/// Defines a logger for this class.
-		/// </summary>
-		private static readonly Logging.Logger log = Logging.LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
+		private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
 
-		
-		public void HandlePacket(GameClient client, GSPacketIn packet)
+		protected override void HandlePacketInternal(GameClient client, GSPacketIn packet)
 		{
 			if (client == null || client.Player == null)
 				return;
@@ -75,6 +48,7 @@ namespace DOL.GS.PacketHandler.Client.v168
 			}
 
 			//packet.Skip(1);
+			search.realm = client.Player.Realm;
 			search.slot = (int)packet.ReadByte();
 			//search.skill = (int)packet.ReadInt();
 			//search.resist = (int)packet.ReadInt();
@@ -111,28 +85,8 @@ namespace DOL.GS.PacketHandler.Client.v168
 			search.levelMin = (byte)packet.ReadByte();
 			search.levelMax = (byte)packet.ReadByte();
 			search.minQual = (byte)packet.ReadByte();
-
-			var priceMin1 = packet.ReadByte();
-			var priceMin1b = packet.ReadByte();
-			priceMin1b = priceMin1b != 0 ? priceMin1b : 1;
-			var priceMin1c = packet.ReadByte();
-			priceMin1c = priceMin1c != 0 ? priceMin1c : 1;
-			var priceMin1d = packet.ReadByte();
-			priceMin1d = priceMin1d != 0 ? priceMin1d : 1;
-			priceMin1d = priceMin1b == 1 && priceMin1c == 1 && priceMin1d == 1 ? 0 : priceMin1d;
-			search.priceMin = (uint)(priceMin1b * priceMin1c * priceMin1d * 256 + priceMin1);
-
-			var priceMax1 = packet.ReadByte();
-			var priceMax1b = packet.ReadByte();
-			priceMax1b = priceMax1b != 0 ? priceMax1b : 1;
-			var priceMax1c = packet.ReadByte();
-			priceMax1c = priceMax1c != 0 ? priceMax1c : 1;
-			var priceMax1d = packet.ReadByte();
-			priceMax1d = priceMax1d != 0 ? priceMax1d : 1;
-			priceMax1d = priceMax1b == 1 && priceMax1c == 1 && priceMax1d == 1 ? 0 : priceMax1d;
-			search.priceMax = (uint)(priceMax1b * priceMax1c * priceMax1d * 256 + priceMax1);
-
-
+			search.priceMin = packet.ReadIntLowEndian();
+			search.priceMax = packet.ReadIntLowEndian();
 			search.playerCrafted = (byte)packet.ReadByte(); // 1 = show only Player crafted, 0 = all
 			search.visual = (int)packet.ReadByte();
 			search.page = (byte)packet.ReadByte();

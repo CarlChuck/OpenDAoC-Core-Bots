@@ -38,48 +38,31 @@ namespace DOL.AI.Brain
             {
                 case eCheckSpellType.Defensive:
                 {
-                    switch (spell.SpellType)
-                    {
-                        case eSpellType.HeatColdMatterBuff:
-                        case eSpellType.BodySpiritEnergyBuff:
-                        case eSpellType.ArmorAbsorptionBuff:
-                        case eSpellType.AblativeArmor:
-                        {
-                            GameLiving target = FindTargetForDefensiveSpell(spell);
+                    if (spell.IsHarmful)
+                        return false;
 
-                            if (target != null)
-                                return TrustCast(spell, eCheckSpellType.Defensive, FindTargetForDefensiveSpell(spell), CheckLosBeforeCastingDefensiveSpells);
+                    GameLiving target = FindTargetForDefensiveSpell(spell);
 
-                            break;
-                        }
-                    }
+                    if (target != null)
+                        return TrustCast(spell, eCheckSpellType.Defensive, target, CheckLosBeforeCastingDefensiveSpells);
 
-                    return false;
+                    break;
                 }
                 case eCheckSpellType.Offensive:
                 {
-                    switch (spell.SpellType)
-                    {
-                        case eSpellType.DirectDamage:
-                        case eSpellType.DamageSpeedDecrease:
-                        case eSpellType.SpeedDecrease:
-                        case eSpellType.Taunt:
-                        case eSpellType.MeleeDamageDebuff:
-                        {
-                            GameLiving target = CalculateNextAttackTarget();
+                    if (!spell.IsHarmful)
+                        return false;
 
-                            if (target != null)
-                                return TrustCast(spell, eCheckSpellType.Offensive, target, CheckLosBeforeCastingOffensiveSpells);
+                    GameLiving target = CalculateNextAttackTarget();
 
-                            break;
-                        }
-                    }
+                    if (target != null)
+                        return TrustCast(spell, eCheckSpellType.Offensive, target, CheckLosBeforeCastingOffensiveSpells);
 
-                    return false;
+                    break;
                 }
-                default:
-                    return false;
             }
+
+            return false;
         }
 
         protected override GameLiving FindTargetForDefensiveSpell(Spell spell)

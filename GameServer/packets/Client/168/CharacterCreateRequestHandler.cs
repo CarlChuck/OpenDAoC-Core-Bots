@@ -7,6 +7,7 @@ using DOL.Database;
 using DOL.Events;
 using DOL.GS.Housing;
 using DOL.GS.ServerProperties;
+using DOL.Logging;
 
 namespace DOL.GS.PacketHandler.Client.v168
 {
@@ -15,17 +16,9 @@ namespace DOL.GS.PacketHandler.Client.v168
     /// in order to support future debugging. - Tolakram
     /// </summary>
     [PacketHandler(PacketHandlerType.TCP, eClientPackets.CharacterCreateRequest, "Handles character creation requests", eClientStatus.LoggedIn)]
-    public class CharacterCreateRequestHandler : IPacketHandler
+    public class CharacterCreateRequestHandler : PacketHandler
     {
-        /// <summary>
-        /// Defines a logger for this class.
-        /// </summary>
-        private static readonly Logging.Logger log = Logging.LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
-
-        /// <summary>
-        /// Max Points to allow on player creation
-        /// </summary>
-        private const int MaxStartingBonusPoints = 30;
+        private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
 
         /// <summary>
         /// Client Operation Value.
@@ -38,7 +31,7 @@ namespace DOL.GS.PacketHandler.Client.v168
             Unknown = 0x456789AB,
         }
 
-        public void HandlePacket(GameClient client, GSPacketIn packet)
+        protected override void HandlePacketInternal(GameClient client, GSPacketIn packet)
         {
             bool needRefresh = false;
 
@@ -555,6 +548,8 @@ namespace DOL.GS.PacketHandler.Client.v168
                     character.FaceType = (byte)pdata.FaceType;
                     character.HairStyle = (byte)pdata.HairStyle;
                     character.MoodType = (byte)pdata.MoodType;
+                    character.CreationModel = pdata.CreationModel;
+                    character.CurrentModel = character.CreationModel;
                 }
 
                 if (pdata.CustomMode != 3)
@@ -588,16 +583,16 @@ namespace DOL.GS.PacketHandler.Client.v168
 
                         if (charClass != null)
                         {
-                            bool valid = IsCustomPointsDistributionValid(character, stats, out var points);
+                            bool valid = CharacterStatValidator.Validate(character, stats, out int distributedPoints);
 
                             // Hacking attemp ?
-                            if (points > MaxStartingBonusPoints)
+                            if (distributedPoints > CharacterStatValidator.PointDistributionBudget)
                             {
                                 if ((ePrivLevel)client.Account.PrivLevel == ePrivLevel.Player)
                                 {
                                     if (Properties.BAN_HACKERS)
                                     {
-                                        client.BanAccount($"Autoban Hack char update : Wrong allowed points:{points}");
+                                        client.BanAccount($"Autoban Hack char update : Wrong allowed points:{distributedPoints}");
                                     }
 
                                     client.Disconnect();
@@ -702,9 +697,11 @@ namespace DOL.GS.PacketHandler.Client.v168
                         character.FaceType = (byte)pdata.FaceType;
                         character.HairStyle = (byte)pdata.HairStyle;
                         character.MoodType = (byte)pdata.MoodType;
-
+                        character.CreationModel = pdata.CreationModel;
+                        character.CurrentModel = character.CreationModel;
                     }
                 }
+
                 if (type == 2 || type == 3) // attributes changes
                 {
                     if (pdata.CustomMode != 3)//patch 0042 // TODO check out these different custommodes
@@ -737,10 +734,10 @@ namespace DOL.GS.PacketHandler.Client.v168
 
                             if (charClass != null)
                             {
-                                bool valid = IsCustomPointsDistributionValid(character, stats, out int points);
+                                bool valid = CharacterStatValidator.Validate(character, stats, out int distributedPoints);
 
                                 // Hacking attemp ?
-                                if (points > MaxStartingBonusPoints)
+                                if (distributedPoints > CharacterStatValidator.PointDistributionBudget)
                                 {
                                     if (log.IsInfoEnabled)
                                         log.InfoFormat("Stats above MaxStartingBonusPoints for {0}", character.Name);
@@ -749,11 +746,11 @@ namespace DOL.GS.PacketHandler.Client.v168
                                     {
                                         if (Properties.BAN_HACKERS)
                                         {
-                                            client.BanAccount(string.Format("Autoban Hack char update : Wrong allowed points:{0}", points));
+                                            client.BanAccount($"Autoban Hack char update : Wrong allowed points:{distributedPoints}");
                                         }
 
                                         if (log.IsInfoEnabled)
-                                            log.InfoFormat("Disconnecting {0} because the stats  are above expected", character.Name);
+                                            log.InfoFormat("Disconnecting {0} because the stats are above expected", character.Name);
 
                                         client.Disconnect();
                                         return false;
@@ -916,71 +913,6 @@ namespace DOL.GS.PacketHandler.Client.v168
         }
 
         /// <summary>
-        /// Check if Custom Creation Points Distribution is Valid.
-        /// </summary>
-        /// <param name="character"></param>
-        /// <param name="stats"></param>
-        /// <param name="points"></param>
-        /// <returns></returns>
-        public static bool IsCustomPointsDistributionValid(DbCoreCharacter character, IDictionary<eStat, int> stats, out int points)
-        {
-            ICharacterClass charClass = ScriptMgr.FindCharacterClass(character.Class);
-
-            if (charClass != null)
-            {
-                points = 0;
-
-                // check if each stat is valid.
-                foreach (var stat in stats.Keys)
-                {
-                    int raceAmount = GlobalConstants.STARTING_STATS_DICT[(eRace)character.Race][stat];
-
-                    int classAmount = 0;
-
-                    for (int level = character.Level; level > 5; level--)
-                    {
-                        if (charClass.PrimaryStat != eStat.UNDEFINED && charClass.PrimaryStat == stat)
-                        {
-                            classAmount++;
-                        }
-
-                        if (charClass.SecondaryStat != eStat.UNDEFINED && charClass.SecondaryStat == stat && (level - 6) % 2 == 0)
-                        {
-                            classAmount++;
-                        }
-
-                        if (charClass.TertiaryStat != eStat.UNDEFINED && charClass.TertiaryStat == stat && (level - 6) % 3 == 0)
-                        {
-                            classAmount++;
-                        }
-                    }
-
-                    int above = stats[stat] - raceAmount - classAmount;
-
-                    // Miss Some points...
-                    if (above < 0 && character.Level == 1)
-                    {
-                        return false;
-                    }
-
-                    points += above;
-                    points += Math.Max(0, above - 10); // two points used
-                    points += Math.Max(0, above - 15); // three points used
-                }
-
-                var validPoints = points == MaxStartingBonusPoints;
-
-                if (character.Level > 1)
-                    return true;
-
-                return validPoints;
-            }
-
-            points = -1;
-            return false;
-        }
-
-        /// <summary>
         /// Verify whether created character is valid
         /// </summary>
         /// <param name="ch">The character to check</param>
@@ -1013,27 +945,23 @@ namespace DOL.GS.PacketHandler.Client.v168
 
                     valid = false;
                 }
-                
+
                 ICharacterClass charClass = ScriptMgr.FindCharacterClass(ch.Class);
 
-				if(!charClass.EligibleRaces.Exists(s => (int)s.ID == ch.Race))
-				{
-					if (log.IsWarnEnabled)
-						log.WarnFormat("Wrong race: {0}, class:{1} on character creation from Account: {2}", ch.Race, ch.Class, ch.AccountName);
-
-					valid = false;
-				}
-                
-				// int pointsUsed;
-				var stats = new Dictionary<eStat, int>{{eStat.STR, ch.Strength},{eStat.CON, ch.Constitution},{eStat.DEX, ch.Dexterity},{eStat.QUI, ch.Quickness},
-					{eStat.INT, ch.Intelligence},{eStat.PIE, ch.Piety},{eStat.EMP, ch.Empathy},{eStat.CHR, ch.Charisma},};
-    
-                valid &= IsCustomPointsDistributionValid(ch, stats, out var pointsUsed);
-
-                if (pointsUsed != MaxStartingBonusPoints)
+                if(!charClass.EligibleRaces.Exists(s => (int)s.ID == ch.Race))
                 {
                     if (log.IsWarnEnabled)
-                        log.Warn($"Points used: {pointsUsed} on character creation from Account: {ch.AccountName}");
+                        log.WarnFormat("Wrong race: {0}, class:{1} on character creation from Account: {2}", ch.Race, ch.Class, ch.AccountName);
+
+                    valid = false;
+                }
+
+                valid &= CharacterStatValidator.Validate(ch, out int distributedPoints);
+
+                if (distributedPoints != CharacterStatValidator.PointDistributionBudget)
+                {
+                    if (log.IsWarnEnabled)
+                        log.Warn($"Points used: {distributedPoints} on character creation from Account: {ch.AccountName}");
 
                     valid = false;
                 }

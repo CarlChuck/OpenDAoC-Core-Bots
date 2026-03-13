@@ -305,13 +305,12 @@ namespace DOL.AI.Brain
                     spell.Name = "Drain Life Essence";
                     spell.Range = 1800;
                     spell.SpellID = 11733;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = eSpellType.DirectDamageNoVariance.ToString();
                     spell.MoveCast = true;
                     spell.Uninterruptible = true;
                     spell.DamageType = (int) eDamageType.Body; //Body DMG Type
                     m_Reckoner_Lifetap = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Reckoner_Lifetap);
                 }
                 return m_Reckoner_Lifetap;
             }

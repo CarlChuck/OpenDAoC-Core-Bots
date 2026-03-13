@@ -67,13 +67,12 @@ namespace DOL.GS.Scripts
                     spell.Damage = 0;
                     spell.DamageType = (int) eDamageType.Spirit;
                     spell.SpellID = 4575;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.MoveCast = true;
                     spell.Type = eSpellType.SpiritResistDebuff.ToString();
                     spell.Message1 = "You feel more vulnerable to spirit magic!";
                     spell.Message2 = "{0} seems vulnerable to spirit magic!";
                     m_Debuff = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Debuff);
                 }
                 return m_Debuff;
             }
@@ -102,11 +101,10 @@ namespace DOL.GS.Scripts
                     spell.Radius = 1000;
                     spell.Damage = 0;
                     spell.DamageType = (int) eDamageType.Spirit;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.MoveCast = false;
                     spell.Type = eSpellType.SpiritResistDebuff.ToString();
                     m_Summon = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Summon);
                 }
                 return m_Summon;
             }
@@ -132,13 +130,12 @@ namespace DOL.GS.Scripts
                     spell.Range = 1000;
                     spell.Radius = 750;
                     spell.SpellID = 2797;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = eSpellType.DirectDamageNoVariance.ToString();
                     spell.Uninterruptible = true;
                     spell.MoveCast = false;
                     spell.DamageType = (int) eDamageType.Spirit; //Spirit DMG Type
                     m_BombSpell = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_BombSpell);
                 }
                 return m_BombSpell;
             }
@@ -164,13 +161,12 @@ namespace DOL.GS.Scripts
                     spell.Range = 1000;
                     spell.Radius = 1500;
                     spell.SpellID = 2797;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = eSpellType.DirectDamageNoVariance.ToString();
                     spell.Uninterruptible = true;
                     spell.MoveCast = false;
                     spell.DamageType = (int) eDamageType.Spirit; //Spirit DMG Type
                     m_BigBombSpell = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_BigBombSpell);
                 }
                 return m_BigBombSpell;
             }

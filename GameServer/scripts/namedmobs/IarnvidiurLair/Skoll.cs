@@ -95,13 +95,12 @@ namespace DOL.GS
 					spell.Value = 10;
 					spell.Duration = 20;
 					spell.SpellID = 11810;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageWithDebuff.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Heat;
 					m_SkollDD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_SkollDD);
 				}
 				return m_SkollDD;
 			}
@@ -201,12 +200,11 @@ namespace DOL.AI.Brain
 					spell.Range = 1500;
 					spell.Value = 38;
 					spell.SpellID = 11811;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.CombatSpeedDebuff.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_Skoll_Haste_Debuff = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Skoll_Haste_Debuff);
 				}
 				return m_Skoll_Haste_Debuff;
 			}
@@ -236,12 +234,11 @@ namespace DOL.AI.Brain
 					spell.Duration = 20;
 					spell.Frequency = 40;
 					spell.SpellID = 11812;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DamageOverTime.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Heat;
 					m_Skoll_Dot = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Skoll_Dot);
 				}
 				return m_Skoll_Dot;
 			}

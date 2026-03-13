@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
@@ -8,6 +9,7 @@ using System.Threading;
 using DOL.Database.Attributes;
 using DOL.Database.Connection;
 using DOL.Database.UniqueID;
+using DOL.Timing;
 
 namespace DOL.Database
 {
@@ -442,7 +444,7 @@ namespace DOL.Database
                                         tableHandler.TableName);
 
             var primary = columns.FirstOrDefault(col => col.PrimaryKey != null);
-            var dataObjects = new List<IList<DataObject>>();
+            var dataObjects = new List<List<DataObject>>();
             ExecuteSelectImpl(command, parameters, reader => FillQueryResultList(reader, tableHandler, columns, primary, dataObjects));
 
             return dataObjects.ToArray();
@@ -457,42 +459,49 @@ namespace DOL.Database
                                         tableHandler.TableName);
 
             var primary = columns.FirstOrDefault(col => col.PrimaryKey != null);
-            var dataObjects = new List<IList<DataObject>>();
+            var dataObjects = new List<List<DataObject>>();
 
             ExecuteSelectImpl(selectFromExpression, whereClauseBatch, reader => FillQueryResultList(reader, tableHandler, columns, primary, dataObjects));
 
             return dataObjects.ToArray();
         }
 
-        private void FillQueryResultList(IDataReader reader, DataTableHandler tableHandler, ElementBinding[] columns, ElementBinding primary, List<IList<DataObject>> resultList)
+        private void FillQueryResultList(IDataReader reader, DataTableHandler tableHandler, ElementBinding[] columns, ElementBinding primary, List<List<DataObject>> resultList)
         {
-            var list = new List<DataObject>();
-            var data = new object[reader.FieldCount];
+            List<DataObject> list = new();
+            object[] buffer = ArrayPool<object>.Shared.Rent(columns.Length);
 
-            while (reader.Read())
+            try
             {
-                reader.GetValues(data);
-                DataObject obj = _dataObjectConstructorCache.GetOrAdd(tableHandler.ObjectType, (key) => CompiledConstructorFactory.CompileConstructor(key, []) as Func<DataObject>)();
-
-                // Fill Object
-                var current = 0;
-                foreach (var column in columns)
+                while (reader.Read())
                 {
-                    DatabaseSetValue(obj, column, data[current]);
-                    current++;
+                    reader.GetValues(buffer);
+                    DataObject obj = _dataObjectConstructorCache.GetOrAdd(tableHandler.ObjectType, (key) => CompiledConstructorFactory.CompileConstructor(key, []) as Func<DataObject>)();
+
+                    // Fill Object
+                    var current = 0;
+                    foreach (var column in columns)
+                    {
+                        DatabaseSetValue(obj, column, buffer[current]);
+                        current++;
+                    }
+
+                    // Set Primary Key
+                    if (primary != null)
+                        obj.ObjectId = primary.GetValue(obj).ToString();
+
+                    list.Add(obj);
+                    obj.Dirty = false;
+                    obj.IsPersisted = true;
+                    // Don't call `TakeSnapshot` here, `FillObjectRelations` must be called first.
                 }
 
-                // Set Primary Key
-                if (primary != null)
-                    obj.ObjectId = primary.GetValue(obj).ToString();
-
-                list.Add(obj);
-                obj.Dirty = false;
-                obj.IsPersisted = true;
-                // Don't call `TakeSnapshot` here, `FillObjectRelations` must be called first.
+                resultList.Add(list);
             }
-
-            resultList.Add(list.ToArray());
+            finally
+            {
+                ArrayPool<object>.Shared.Return(buffer);
+            }
         }
 
         /// <summary>
@@ -604,13 +613,12 @@ namespace DOL.Database
                         try
                         {
                             OpenConnection(conn);
-                            long start = (DateTime.UtcNow.Ticks / 10000);
+                            long start = MonotonicTime.NowMs;
 
                             foreach (var parameter in parameters.Skip(current))
                             {
                                 cmd.CommandText = SQLCommand;
                                 FillSQLParameter(parameter, cmd.Parameters);
-                                cmd.Prepare();
 
                                 using (var reader = cmd.ExecuteReader())
                                 {
@@ -632,10 +640,14 @@ namespace DOL.Database
                             }
 
                             if (log.IsDebugEnabled)
-                                log.DebugFormat("ExecuteSelectImpl: SQL Select exec time {0}ms", ((DateTime.UtcNow.Ticks / 10000) - start));
-                            else if (log.IsWarnEnabled && (DateTime.UtcNow.Ticks / 10000) - start > 500)
-                                log.WarnFormat("ExecuteSelectImpl: SQL Select took {0}ms!\n{1}", ((DateTime.UtcNow.Ticks / 10000) - start), SQLCommand);
+                                log.DebugFormat("ExecuteSelectImpl: SQL Select exec time {0}ms", MonotonicTime.NowMs - start);
+                            else if (log.IsWarnEnabled)
+                            {
+                                long diff = MonotonicTime.NowMs - start;
 
+                                if (diff > LONG_EXEC_THRESHOLD)
+                                    log.WarnFormat("ExecuteSelectImpl: SQL Select took {0}ms!\n{1}", diff, SQLCommand);
+                            }
                         }
                         catch (Exception e)
                         {
@@ -678,13 +690,12 @@ namespace DOL.Database
                     try
                     {
                         OpenConnection(conn);
-                        long start = (DateTime.UtcNow.Ticks / 10000);
+                        long start = MonotonicTime.NowMs;
 
                         foreach (var whereClause in whereClauseBatch.Skip(current))
                         {
                             cmd.CommandText = selectFromExpression + whereClause.ParameterizedText;
                             FillSQLParameter(whereClause.Parameters, cmd.Parameters);
-                            cmd.Prepare();
 
                             using (var reader = cmd.ExecuteReader())
                             {
@@ -706,9 +717,14 @@ namespace DOL.Database
                         }
 
                         if (log.IsDebugEnabled)
-                            log.DebugFormat("ExecuteSelectImpl: SQL Select exec time {0}ms", ((DateTime.UtcNow.Ticks / 10000) - start));
-                        else if (log.IsWarnEnabled && (DateTime.UtcNow.Ticks / 10000) - start > 500)
-                            log.WarnFormat("ExecuteSelectImpl: SQL Select took {0}ms!\n{1}", ((DateTime.UtcNow.Ticks / 10000) - start), selectFromExpression);
+                            log.DebugFormat("ExecuteSelectImpl: SQL Select exec time {0}ms", MonotonicTime.NowMs - start);
+                        else if (log.IsWarnEnabled)
+                        {
+                            long diff = MonotonicTime.NowMs - start;
+
+                            if (diff > LONG_EXEC_THRESHOLD)
+                                log.WarnFormat("ExecuteSelectImpl: SQL Select took {0}ms!\n{1}", diff, selectFromExpression);
+                        }
                     }
                     catch (Exception e)
                     {
@@ -821,12 +837,11 @@ namespace DOL.Database
                         {
                             cmd.CommandText = SQLCommand;
                             OpenConnection(conn);
-                            long start = (DateTime.UtcNow.Ticks / 10000);
+                            long start = MonotonicTime.NowMs;
 
                             foreach (var parameter in parameters.Skip(current))
                             {
                                 FillSQLParameter(parameter, cmd.Parameters);
-                                cmd.Prepare();
 
                                 var result = -1;
                                 try
@@ -854,9 +869,14 @@ namespace DOL.Database
                             }
 
                             if (log.IsDebugEnabled)
-                                log.DebugFormat("ExecuteNonQueryImpl: SQL NonQuery exec time {0}ms", ((DateTime.UtcNow.Ticks / 10000) - start));
-                            else if (log.IsWarnEnabled && (DateTime.UtcNow.Ticks / 10000) - start > 500)
-                                log.WarnFormat("ExecuteNonQueryImpl: SQL NonQuery took {0}ms!\n{1}", ((DateTime.UtcNow.Ticks / 10000) - start), SQLCommand);
+                                log.DebugFormat("ExecuteNonQueryImpl: SQL NonQuery exec time {0}ms", MonotonicTime.NowMs - start);
+                            else if (log.IsWarnEnabled)
+                            {
+                                long diff = MonotonicTime.NowMs - start;
+
+                                if (diff > LONG_EXEC_THRESHOLD)
+                                    log.WarnFormat("ExecuteNonQueryImpl: SQL NonQuery took {0}ms!\n{1}", diff, SQLCommand);
+                            }
                         }
                         catch (Exception e)
                         {

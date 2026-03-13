@@ -254,13 +254,12 @@ namespace DOL.GS
 					spell.Radius = 800;
 					spell.Duration = 120;
 					spell.SpellID = 11843;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "Disease";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Energy; //Energy DMG Type
 					m_HydraDisease = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_HydraDisease);
 				}
 				return m_HydraDisease;
 			}
@@ -285,12 +284,11 @@ namespace DOL.GS
 					spell.Value = 24;
 					spell.Radius = 800;
 					spell.SpellID = 11844;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.CombatSpeedDebuff.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_Hydra_Haste_Debuff = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Hydra_Haste_Debuff);
 				}
 				return m_Hydra_Haste_Debuff;
 			}
@@ -685,12 +683,11 @@ namespace DOL.AI.Brain
 					spell.Range = 2000;
 					spell.Radius = 800;
 					spell.SpellID = 11849;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DamageOverTime.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Body;
 					m_Hydra_Dot = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Hydra_Dot);
 				}
 				return m_Hydra_Dot;
 			}
@@ -714,12 +711,11 @@ namespace DOL.AI.Brain
 					spell.Range = 2000;
 					spell.Radius = 450;
 					spell.SpellID = 11840;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Heat;
 					m_Hydra_DD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Hydra_DD);
 				}
 				return m_Hydra_DD;
 			}
@@ -743,12 +739,11 @@ namespace DOL.AI.Brain
 					spell.Range = 2000;
 					spell.Radius = 200;
 					spell.SpellID = 11850;
-					spell.Target = "Area";
+					spell.Target = eSpellTarget.AREA.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Heat;
 					m_Hydra_DD2 = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Hydra_DD2);
 				}
 				return m_Hydra_DD2;
 			}
@@ -772,12 +767,11 @@ namespace DOL.AI.Brain
 					spell.Range = 0;
 					spell.Radius = 1800;
 					spell.SpellID = 11841;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Heat;
 					m_Hydra_PBAOE = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Hydra_PBAOE);
 				}
 				return m_Hydra_PBAOE;
 			}
@@ -801,12 +795,11 @@ namespace DOL.AI.Brain
 					spell.Range = 0;
 					spell.Radius = 1800;
 					spell.SpellID = 11842;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.Stun.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Body;
 					m_Hydra_Stun = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Hydra_Stun);
 				}
 				return m_Hydra_Stun;
 			}
@@ -1005,12 +998,11 @@ namespace DOL.AI.Brain
 					spell.Name = "Breath of Darkness";
 					spell.Range = 2000;
 					spell.SpellID = 11845;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Cold;
 					m_Head2_DD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Head2_DD);
 				}
 				return m_Head2_DD;
 			}
@@ -1210,12 +1202,11 @@ namespace DOL.AI.Brain
 					spell.Name = "Breath of Flame";
 					spell.Range = 2000;
 					spell.SpellID = 11846;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Heat;
 					m_Head3_DD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Head3_DD);
 				}
 				return m_Head3_DD;
 			}
@@ -1415,12 +1406,11 @@ namespace DOL.AI.Brain
 					spell.Name = "Breath of Spirit";
 					spell.Range = 2000;
 					spell.SpellID = 11847;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Spirit;
 					m_Head4_DD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Head4_DD);
 				}
 				return m_Head4_DD;
 			}
@@ -1619,12 +1609,11 @@ namespace DOL.AI.Brain
 					spell.Name = "Breath of Matter";
 					spell.Range = 2000;
 					spell.SpellID = 11848;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Matter;
 					m_Head5_DD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Head5_DD);
 				}
 				return m_Head5_DD;
 			}

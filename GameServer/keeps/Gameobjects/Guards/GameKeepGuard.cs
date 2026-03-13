@@ -119,8 +119,6 @@ namespace DOL.GS.Keeps
 
 		private bool m_changingPositions = false;
 
-		public GameLiving HealTarget = null;
-
 		/// <summary>
 		/// The keep lord is under attack, go help them
 		/// </summary>
@@ -133,21 +131,6 @@ namespace DOL.GS.Keeps
 		}
 
 		#region Combat
-
-		public void GuardStartSpellHealCheckLos(GamePlayer player, LosCheckResponse response, ushort sourceOID, ushort targetOID)
-		{
-			if (response is LosCheckResponse.True && HealTarget != null)
-			{
-				Spell healSpell = GetGuardHealSmallSpell(Realm);
-
-				if (healSpell != null && !IsStunned && !IsMezzed)
-				{
-					attackComponent.StopAttack();
-					TargetObject = HealTarget;
-					CastSpell(healSpell, GuardSpellLine);
-				}
-			}
-		}
 
 		private static Spell GetGuardHealSmallSpell(eRealm realm)
 		{
@@ -164,16 +147,15 @@ namespace DOL.GS.Keeps
 			return null;
 		}
 
-		public void CheckAreaForHeals()
+		public bool CheckAreaForHeals()
 		{
 			GameLiving target = null;
-			GamePlayer LOSChecker = null;
 
 			foreach (GamePlayer player in GetPlayersInRadius(2000))
 			{
-				LOSChecker = player;
+				if (!player.IsAlive)
+					continue;
 
-				if (!player.IsAlive) continue;
 				if (GameServer.ServerRules.IsSameRealm(player, this, true))
 				{
 					if (player.HealthPercent < Properties.KEEP_HEAL_THRESHOLD)
@@ -188,7 +170,9 @@ namespace DOL.GS.Keeps
 			{
 				foreach (GameNPC npc in GetNPCsInRadius(2000))
 				{
-					if (npc is GameSiegeWeapon) continue;
+					if (npc is GameSiegeWeapon || !npc.IsAlive)
+						continue;
+
 					if (GameServer.ServerRules.IsSameRealm(npc, this, true))
 					{
 						if (npc.HealthPercent < Properties.KEEP_HEAL_THRESHOLD)
@@ -200,23 +184,14 @@ namespace DOL.GS.Keeps
 				}
 			}
 
-			if (target != null)
-			{
-				if (LOSChecker == null)
-				{
-					foreach (GamePlayer player in GetPlayersInRadius(WorldMgr.VISIBILITY_DISTANCE))
-					{
-						LOSChecker = player;
-						break;
-					}
-				}
-				if (LOSChecker == null)
-					return;
-				if (!target.IsAlive) return;
+			if (target == null)
+				return false;
 
-				HealTarget = target;
-				LOSChecker.Out.SendCheckLos(this, target, new CheckLosResponse(GuardStartSpellHealCheckLos));
-			}
+			GameObject oldTarget = TargetObject;
+			TargetObject = target;
+			bool cast = CastSpell(GetGuardHealSmallSpell(Realm), SkillBase.GetSpellLine(GlobalSpellsLines.Mob_Spells), true);
+			TargetObject = oldTarget;
+			return cast;
 		}
 
 		/// <summary>
@@ -358,11 +333,11 @@ namespace DOL.GS.Keeps
 
 				foreach (GameKeepGuard guard in PatrolGroup.PatrolGuards)
 				{
-					if (guard.IsAlive && guard.CurrentWaypoint != null)
+					if (guard.IsAlive && guard.CurrentPathPoint != null)
 					{
-						CurrentWaypoint = guard.CurrentWaypoint;
+						CurrentPathPoint = guard.CurrentPathPoint;
 						m_changingPositions = true;
-						MoveTo(guard.CurrentRegionID, guard.X - Util.Random(200, 350), guard.Y - Util.Random(200, 350), guard.Z, guard.Heading);
+						MoveTo(guard.CurrentRegionID, guard.X, guard.Y, guard.Z, guard.Heading);
 						m_changingPositions = false;
 						foundGuard = true;
 						break;
@@ -370,7 +345,7 @@ namespace DOL.GS.Keeps
 				}
 
 				if (!foundGuard)
-					CurrentWaypoint = PatrolGroup.PatrolPath;
+					CurrentPathPoint = PatrolGroup.PatrolPath;
 
 				MoveOnPath(Patrol.PATROL_SPEED);
 			}
@@ -485,7 +460,9 @@ namespace DOL.GS.Keeps
         public override void LoadFromDatabase(DataObject mobobject)
 		{
 			base.LoadFromDatabase(mobobject);
-			foreach (AbstractArea area in this.CurrentAreas)
+			movementComponent.ForceUpdatePosition(); // Ensures `CurrentAreas` returns something.
+
+			foreach (AbstractArea area in CurrentAreas)
 			{
 				if (area is KeepArea)
 				{
@@ -503,8 +480,12 @@ namespace DOL.GS.Keeps
 					break;
 				}
 			}
-			RefreshTemplate();			
-		}		
+
+			RefreshTemplate();
+
+			// Guards are immune to confusion effects.
+			AddAbility(SkillBase.GetAbility(GS.Abilities.ConfusionImmunity));
+		}
 
 		public void DeleteObject()
 		{
@@ -912,7 +893,7 @@ namespace DOL.GS.Keeps
 			{
 				DbSpell spell = BaseHealSpell;
 				spell.CastTime = 2;
-				spell.Target = "Self";
+				spell.Target = eSpellTarget.SELF.ToString();
 				spell.Value = 225;
 				if (GameServer.Instance.Configuration.ServerType != EGameServerType.GST_PvE)
 					spell.Uninterruptible = true;
@@ -927,7 +908,7 @@ namespace DOL.GS.Keeps
 				DbSpell spell = BaseHealSpell;
 				spell.CastTime = 2;
 				spell.Value = 200;
-				spell.Target = "Realm";
+				spell.Target = eSpellTarget.REALM.ToString();
 				return spell;
 			}
 		}

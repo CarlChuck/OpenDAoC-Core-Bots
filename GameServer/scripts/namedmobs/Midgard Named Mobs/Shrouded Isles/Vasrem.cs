@@ -152,13 +152,12 @@ namespace DOL.AI.Brain
 					spell.Name = "Drain Life Essence";
 					spell.Range = 1800;
 					spell.SpellID = 11886;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.MoveCast = true;
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Body; //Body DMG Type
 					m_Vasrem_Lifetap = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Vasrem_Lifetap);
 				}
 				return m_Vasrem_Lifetap;
 			}
@@ -182,12 +181,11 @@ namespace DOL.AI.Brain
 					spell.Value = 65;
 					spell.Duration = 60;
 					spell.SpellID = 11887;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "StrengthConstitutionDebuff";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_VasremSCDebuff = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_VasremSCDebuff);
 				}
 				return m_VasremSCDebuff;
 			}
@@ -217,7 +215,6 @@ namespace DOL.AI.Brain
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_VasremDebuffDQ = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_VasremDebuffDQ);
 				}
 				return m_VasremDebuffDQ;
 			}

@@ -304,11 +304,10 @@ namespace DOL.AI.Brain
 					spell.Range = 1500;
 					spell.Radius = 700;
 					spell.SpellID = 11828;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DamageOverTime.ToString();
 					spell.Uninterruptible = true;
 					m_Iarnvidiur_Dot = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Iarnvidiur_Dot);
 				}
 				return m_Iarnvidiur_Dot;
 			}
@@ -336,13 +335,12 @@ namespace DOL.AI.Brain
 					spell.Range = 0;
 					spell.Duration = 600;
 					spell.SpellID = 11829;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "Disease";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Energy; //Energy DMG Type
 					m_IarnvidiurDisease = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_IarnvidiurDisease);
 				}
 				return m_IarnvidiurDisease;
 			}
@@ -372,7 +370,6 @@ namespace DOL.AI.Brain
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Cold;
 					m_Iarnvidiur_Bolt = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Iarnvidiur_Bolt);
 				}
 
 				return m_Iarnvidiur_Bolt;
@@ -396,13 +393,12 @@ namespace DOL.AI.Brain
 					spell.Damage = 400;
 					spell.Range = 1500;
 					spell.SpellID = 11831;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Spirit;
 					m_IarnvidiurDD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_IarnvidiurDD);
 				}
 				return m_IarnvidiurDD;
 			}

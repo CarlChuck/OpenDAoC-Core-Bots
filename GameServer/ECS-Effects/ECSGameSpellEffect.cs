@@ -31,7 +31,9 @@ namespace DOL.GS
             {
                 PulseFreq = 250;
                 NextTick = 1 + Duration / 2 + StartTick + PulseFreq;
-                TriggersImmunity = spell.IsTriggeringImmunitySnare;
+
+                // Special case for focus snares (BD) since they share the same spell type as normal snares.
+                TriggersImmunity = EffectHelper.GetImmunityEffectFromSpell(spell) is not eEffect.Unknown && !spell.IsFocus;
             }
             else if (spell.IsConcentration)
             {
@@ -60,7 +62,7 @@ namespace DOL.GS
         public override void TryApplyImmunity()
         {
             // Only handle players. NPCs have their own immunity logic.
-            if (!TriggersImmunity || OwnerPlayer == null)
+            if (AppliedImmunityType is not ImmunityType.Player)
                 return;
 
             // Summoned pets don't give stun immunities (maybe tweak their spells instead?)
@@ -70,7 +72,7 @@ namespace DOL.GS
             if (SpellHandler is UnresistableStunSpellHandler)
                 return;
 
-            ECSGameEffectFactory.Create(new(Owner, ImmunityDuration, Effectiveness, SpellHandler), (int) PulseFreq, static (in ECSGameEffectInitParams i, int pulseFreq) => new ECSImmunityEffect(i, pulseFreq));
+            ECSGameEffectFactory.Create(new(Owner, ImmunityDuration, Effectiveness, SpellHandler), (int) PulseFreq, static (in i, pulseFreq) => new ECSImmunityEffect(i, pulseFreq));
         }
 
         public override DbPlayerXEffect GetSavedEffect()

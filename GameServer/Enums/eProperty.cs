@@ -106,7 +106,7 @@
         Skill_Music = 80,
         Skill_Celtic_Dual = 81,
         Skill_Celtic_Spear = 82,
-        Skill_RecurvedBow = 83,
+        Skill_RecurveBow = 83,
         Skill_Valor = 84,
         Skill_Subterranean = 85,
         Skill_BoneArmy = 86,
@@ -296,8 +296,6 @@
         MythicalAcuCapBonus = 244,
         MythicalStatCapBonus_Last = 244,
 
-        OffhandDamage = 245,
-        OffhandChance = 246,
         BountyPoints = 247,
         XpPoints = 248,
         Resist_Natural = 249,
@@ -307,6 +305,7 @@
         RealmPoints = 253,
         ArcaneSyphon = 254,
         LivingEffectiveness = 255,
-        MaxProperty = 255
+        PhysicalAbsorption = 256,
+        MaxProperty = 256
     }
 }

@@ -390,11 +390,10 @@ namespace DOL.AI.Brain
                     spell.Name = "Heal";
                     spell.Range = 2500;
                     spell.SpellID = 11891;
-                    spell.Target = "Realm";
+                    spell.Target = eSpellTarget.REALM.ToString();
                     spell.Type = "Heal";
                     m_Fairy_Heal = new Spell(spell, 70);
                     spell.Uninterruptible = true;
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Fairy_Heal);
                 }
                 return m_Fairy_Heal;
             }

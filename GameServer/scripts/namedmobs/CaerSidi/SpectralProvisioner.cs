@@ -307,10 +307,9 @@ namespace DOL.AI.Brain
 					spell.Name = "Spectral Strike";
 					spell.Range = 2500;
 					spell.SpellID = 12018;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DamageSpeedDecreaseNoVariance.ToString();
 					m_SpectralDD = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_SpectralDD);
 				}
 				return m_SpectralDD;
 			}

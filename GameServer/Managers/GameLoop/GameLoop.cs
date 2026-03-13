@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
 using DOL.GS.ServerProperties;
@@ -18,28 +17,21 @@ namespace DOL.GS
         private static Thread _gameLoopThread;
         private static GameLoopThreadPool _threadPool;
         private static GameLoopTickPacer _tickPacer;
-        private static long _stopwatchFrequencyMilliseconds = Stopwatch.Frequency / 1000;
         private static bool _running;
         private static List<TickStep> _tickSequence;
 
-        public static int TickDuration { get; private set; }
+        public static double TickDuration { get; private set; }
         public static long GameLoopTime { get; private set; }
         public static string ActiveService { get; set; }
-
-        // This is unrelated to the game loop and should probably be moved elsewhere.
-        public static long GetRealTime()
-        {
-            return Stopwatch.GetTimestamp() / _stopwatchFrequencyMilliseconds;
-        }
 
         public static bool Init()
         {
             if (Interlocked.CompareExchange(ref _running, true, false))
                 return false;
 
-            TickDuration = Properties.GAME_LOOP_TICK_RATE;
+            TickDuration = 1000.0 / Properties.GAME_LOOP_TICK_RATE;
 
-            _gameLoopThread = new Thread(new ThreadStart(Run))
+            _gameLoopThread = new(new ThreadStart(Run))
             {
                 Name = THREAD_NAME,
                 IsBackground = true
@@ -156,7 +148,8 @@ namespace DOL.GS
             AddStep(AttackService.Instance, AttackService.Instance.Tick);
             AddStep(CastingService.Instance, CastingService.Instance.Tick);
             AddStep(EffectService.Instance, EffectService.Instance.Tick);
-            AddStep(EffectListService.Instance, EffectListService.Instance.Tick);
+            AddStep(EffectListService.Instance, EffectListService.Instance.BeginTick);
+            AddStep(EffectListService.Instance, EffectListService.Instance.EndTick);
             AddStep(MovementService.Instance, MovementService.Instance.Tick);
             AddStep(CraftingService.Instance, CraftingService.Instance.Tick);
             AddStep(ReaperService.Instance, ReaperService.Instance.Tick);

@@ -47,10 +47,9 @@ namespace DOL.GS
 					spell.Name = "Melee Swing";
 					spell.Range = 400;
 					spell.SpellID = 12016;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					m_CrusaderDD = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_CrusaderDD);
 				}
 				return m_CrusaderDD;
 			}

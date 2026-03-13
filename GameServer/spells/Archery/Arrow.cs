@@ -65,16 +65,6 @@ namespace DOL.GS.Spells
 			return true;
 		}
 
-		private void DealDamageCheckLOS(GamePlayer player, bool response, ushort targetOID)
-		{
-			if (response)
-			{
-				GameLiving target = (GameLiving)(Caster.CurrentRegion.GetObject(targetOID));
-				if (target != null)
-					DealDamage(target);
-			}
-		}
-
 		private void DealDamage(GameLiving target)
 		{
 			int ticksToTarget = m_caster.GetDistanceTo(target) * 100 / 85; // 85 units per 1/10s
@@ -122,7 +112,7 @@ namespace DOL.GS.Spells
 
 			protected override int OnTick(ECSGameTimer timer)
 			{
-				// A lot of things here seem to be outdated and need to be cleaned up.
+				// A lot of things here is outdated and need to be rewritten.
 
 				GameLiving target = m_arrowTarget;
 				GameLiving caster = (GameLiving) timer.Owner;
@@ -148,7 +138,7 @@ namespace DOL.GS.Spells
 					return 0;
 				}
 
-				if (Util.ChanceDouble(missrate))
+				if (Util.Chance(missrate))
 				{
 					ad.AttackResult = eAttackResult.Missed;
 					m_handler.MessageToCaster("You miss!", eChatType.CT_YouHit);
@@ -159,7 +149,7 @@ namespace DOL.GS.Spells
 					{
 						IOldAggressiveBrain aggroBrain = ((GameNPC)target).Brain as IOldAggressiveBrain;
 						if (aggroBrain != null)
-							aggroBrain.AddToAggroList(caster, 1);
+							aggroBrain.AddToAggroList(caster);
 					}
 					return 0;
 				}
@@ -168,7 +158,7 @@ namespace DOL.GS.Spells
 
 				bool arrowBlock = false;
 
-				if (target is GamePlayer && !target.IsStunned && !target.IsMezzed && !target.IsSitting && m_handler.Spell.LifeDrainReturn != (int)Archery.eShotType.Critical)
+				if (target is GamePlayer && !target.IsCrowdControlled && !target.IsSitting && m_handler.Spell.LifeDrainReturn != (int)Archery.eShotType.Critical)
 				{
 					GamePlayer player = (GamePlayer)target;
 					DbInventoryItem lefthand = player.ActiveLeftWeapon;
@@ -249,7 +239,7 @@ namespace DOL.GS.Spells
 					effectiveness += (caster.GetModified(eProperty.SpellDamage) * 0.01);
 					damage = damage * effectiveness;
 
-					damage *= (1.0 + RelicMgr.GetRelicBonusModifier(caster.Realm, eRelicType.Magic));
+					damage *= RelicMgr.GetRelicBonusModifier(caster, eRelicType.Magic);
 
 					if (damage < 0) damage = 0;
 
@@ -257,18 +247,14 @@ namespace DOL.GS.Spells
 
 					if (caster.ActiveWeapon != null)
 					{
-						// Quality
-						ad.Damage -= (int)(ad.Damage * (100 - caster.ActiveWeapon.Quality) * .01);
+						ad.Damage = (int) (ad.Damage * caster.ActiveWeapon.Quality * 0.01 * caster.ActiveWeapon.ConditionPercent * 0.01);
 
-						// Condition
-						ad.Damage = (int)((double)ad.Damage * Math.Min(1.0, (double)caster.ActiveWeapon.Condition / (double)caster.ActiveWeapon.MaxCondition));
+                        // Patch Note:  http://support.darkageofcamelot.com/kb/article.php?id=931
+                        // - The Damage Per Second (DPS) of your bow will have an effect on your damage for archery shots. If the effective DPS
+                        //   of your equipped bow is less than that of your max DPS for the level of archery shot you are using, the damage of your
+                        //   shot will be reduced. Max DPS for a particular level can be found by using this equation: (.3 * level) + 1.2
 
-						// Patch Note:  http://support.darkageofcamelot.com/kb/article.php?id=931
-						// - The Damage Per Second (DPS) of your bow will have an effect on your damage for archery shots. If the effective DPS
-						//   of your equipped bow is less than that of your max DPS for the level of archery shot you are using, the damage of your
-						//   shot will be reduced. Max DPS for a particular level can be found by using this equation: (.3 * level) + 1.2
-
-						int spellRequiredDPS = 12 + 3 * m_handler.Spell.Level;
+                        int spellRequiredDPS = 12 + 3 * m_handler.Spell.Level;
 
 						if (caster.ActiveWeapon.DPS_AF < spellRequiredDPS)
 						{

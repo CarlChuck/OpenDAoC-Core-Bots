@@ -18,9 +18,8 @@ namespace DOL.GS.Spells
 			Rapid = 4
 		}
 
-		/// <summary>
-		/// Does this spell break stealth on start?
-		/// </summary>
+		public override SpellCostType CostType => SpellCostType.Endurance;
+
 		public override bool UnstealthCasterOnStart
 		{
 			get { return false; }
@@ -118,7 +117,7 @@ namespace DOL.GS.Spells
 						player = target as GamePlayer;
 						player.Out.SendMessage("A shot penetrated your magic barrier!", eChatType.CT_SpellResisted, eChatLoc.CL_SystemWindow);
 						ad.AttackResult = eAttackResult.HitUnstyled;
-						bladeturn.Stop();
+						bladeturn.End();
 						break;
 					}
 					case (int)eShotType.Other:
@@ -134,7 +133,7 @@ namespace DOL.GS.Spells
 							player = target as GamePlayer;
 							player.Out.SendMessage("The blow was absorbed by a magical barrier!", eChatType.CT_SpellResisted, eChatLoc.CL_SystemWindow);
 							ad.AttackResult = eAttackResult.Missed;
-							bladeturn.Stop();
+							bladeturn.End();
 						}
 						break;
 					}
@@ -196,7 +195,7 @@ namespace DOL.GS.Spells
 				Caster.LastAttackTickPvE = GameLoop.GameLoopTime;
 				Caster.LastAttackTickPvP = GameLoop.GameLoopTime;
 
-				foreach (GameLiving npc in WorldMgr.GetNPCsCloseToSpot(Caster.CurrentRegionID, Caster.GroundTarget.X, Caster.GroundTarget.Y, Caster.GroundTarget.Z, (ushort)Spell.Radius))
+				foreach (GameLiving npc in WorldMgr.GetNPCsCloseToSpot(Caster.CurrentRegionID, Caster.GroundTarget, (ushort)Spell.Radius))
 				{
 					if (npc.Realm == 0 || Caster.Realm == 0)
 					{
@@ -272,7 +271,7 @@ namespace DOL.GS.Spells
 				var list = new List<string>();
 				//list.Add("Function: " + (Spell.SpellType == string.Empty ? "(not implemented)" : Spell.SpellType));
 				//list.Add(" "); //empty line
-				list.Add(Spell.Description);
+				list.Add(ShortDescription);
 				list.Add(" "); //empty line
 				if (Spell.InstrumentRequirement != 0)
 					list.Add("Instrument require: " + GlobalConstants.InstrumentTypeToName(Spell.InstrumentRequirement));

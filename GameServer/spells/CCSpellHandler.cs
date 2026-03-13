@@ -10,6 +10,8 @@ namespace DOL.GS.Spells
     /// </summary>
     public abstract class AbstractCCSpellHandler : ImmunityEffectSpellHandler
     {
+        public AbstractCCSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
+
         public override void ApplyEffectOnTarget(GameLiving target)
         {
             if (target.HasAbility(Abilities.CCImmunity))
@@ -125,7 +127,10 @@ namespace DOL.GS.Spells
             return resistChance;
         }
 
-        public AbstractCCSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
+        protected override double CalculateBuffDebuffEffectiveness()
+        {
+            return 1.0; // Unused by hard CCs.
+        }
     }
 
     /// <summary>
@@ -134,9 +139,13 @@ namespace DOL.GS.Spells
     [SpellHandler(eSpellType.Mesmerize)]
     public class MesmerizeSpellHandler : AbstractCCSpellHandler
     {
+        public override string ShortDescription => "The target is mesmerized and cannot take any actions.";
+
+        public MesmerizeSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
+
         public override ECSGameSpellEffect CreateECSEffect(in ECSGameEffectInitParams initParams)
         {
-            return ECSGameEffectFactory.Create(initParams, static (in ECSGameEffectInitParams i) => new MezECSGameEffect(i));
+            return ECSGameEffectFactory.Create(initParams, static (in i) => new MezECSGameEffect(i));
         }
 
         public override void OnEffectPulse(GameSpellEffect effect)
@@ -162,11 +171,6 @@ namespace DOL.GS.Spells
 
             if (isImmune)
                 message = "Your target is immune to this effect!";
-            else if (FindStaticEffectOnTarget(target, typeof(MezzRootImmunityEffect)) != null)
-            {
-                message = "Your target is immune to this effect!";
-                isImmune = true;
-            }
             else if (target is GameNPC && target.HealthPercent < 75)
             {
                 message = "Your target is enraged and resists the spell!";
@@ -212,8 +216,6 @@ namespace DOL.GS.Spells
 
             return (int) Math.Clamp(duration, 1, Spell.Duration * 4);
         }
-
-        public MesmerizeSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
     }
 
     /// <summary>
@@ -222,9 +224,13 @@ namespace DOL.GS.Spells
     [SpellHandler(eSpellType.Stun)]
     public class StunSpellHandler : AbstractCCSpellHandler
     {
+        public override string ShortDescription => $"The target is stunned and cannot take any actions for {Spell.Duration / 1000.0} seconds.";
+
+        public StunSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
+
         public override ECSGameSpellEffect CreateECSEffect(in ECSGameEffectInitParams initParams)
         {
-            return ECSGameEffectFactory.Create(initParams, static (in ECSGameEffectInitParams i) => new StunECSGameEffect(i));
+            return ECSGameEffectFactory.Create(initParams, static (in i) => new StunECSGameEffect(i));
         }
 
         protected override GameSpellEffect CreateSpellEffect(GameLiving target, double effectiveness)
@@ -281,7 +287,7 @@ namespace DOL.GS.Spells
             {
                 MessageToCaster("Your target is immune to this effect!", eChatType.CT_SpellResisted);
                 target.StartInterruptTimer(target.SpellInterruptDuration, AttackData.eAttackType.Spell, Caster);
-                base.OnSpellNegated(target, SpellNegatedReason.Immune);
+                OnSpellNegated(target, SpellNegatedReason.Immune);
                 return true;
             }
 
@@ -328,7 +334,5 @@ namespace DOL.GS.Spells
             if (compare.Spell.SpellType == eSpellType.StyleStun) return true;
             return base.HasConflictingEffectWith(compare);
         }
-
-        public StunSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
     }
 }

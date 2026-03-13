@@ -67,7 +67,7 @@ namespace DOL.GS
 
             _weapon = _owner.ActiveWeapon;
             _leftWeapon = _owner.ActiveLeftWeapon;
-            _effectiveness = _owner.Effectiveness;
+            _effectiveness = 1.0; // Don't use `_owner.Effectiveness` here, it's already applied on weaponskill.
 
             if (_owner.ActiveWeaponSlot is not eActiveWeaponSlot.Distance)
                 TickMeleeAttack();
@@ -174,25 +174,22 @@ namespace DOL.GS
             }
 
             return true;
+        }
 
-            bool IsTickDue()
-            {
-                return _owner.ActiveWeaponSlot is not eActiveWeaponSlot.Distance ? GameServiceUtils.ShouldTick(_nextMeleeTick) : GameServiceUtils.ShouldTick(_nextRangedTick);
-            }
+        private bool IsTickDue()
+        {
+            return _owner.ActiveWeaponSlot is not eActiveWeaponSlot.Distance ? GameServiceUtils.ShouldTick(_nextMeleeTick) : GameServiceUtils.ShouldTick(_nextRangedTick);
+        }
 
-            bool IsAllowedToTick()
-            {
-                // 1.82 changed the reactionary window to a fixed 3 seconds. This made placing reactionary styles easier against fast attacks,
-                // but it's also suspected that this is when it became impossible to spam them when the target is stunned.
-                return !_owner.IsCrowdControlled && !_owner.IsEngaging && (_owner.CurrentSpellHandler?.Spell.Uninterruptible) != false;
-            }
+        private bool IsAllowedToTick()
+        {
+            // 1.82 changed the reactionary window to a fixed 3 seconds. This made placing reactionary styles easier against fast attacks,
+            // but it's also suspected that this is when it became impossible to spam them when the target is stunned.
+            return !_owner.IsCrowdControlled && !_owner.IsEngaging && (_owner.CurrentSpellHandler?.Spell.Uninterruptible) != false;
         }
 
         protected virtual bool PrepareMeleeAttack()
         {
-            if (_combatStyle != null && _combatStyle.WeaponTypeRequirement == (int) eObjectType.Shield)
-                _weapon = _leftWeapon;
-
             bool clearOldStyles = false;
 
             if (LastAttackData != null)
@@ -358,6 +355,8 @@ namespace DOL.GS
 
             if (_owner.rangeAttackComponent.RangedAttackType is eRangedAttackType.Critical)
                 _owner.rangeAttackComponent.RangedAttackType = eRangedAttackType.Normal;
+            else if (_owner.rangeAttackComponent.RangedAttackType is eRangedAttackType.Long)
+                (EffectListService.GetEffectOnTarget(_owner, eEffect.TrueShot) as TrueShotECSGameEffect)?.Cancel(true);
 
             // A positive ticksToTarget means the effects of our attack will be delayed. Typically used for ranged attacks.
             if (_ticksToTarget > 0)
@@ -408,19 +407,15 @@ namespace DOL.GS
             _owner.rangeAttackComponent.AttackStartTime = GameLoop.GameLoopTime;
             _owner.rangeAttackComponent.RangedAttackState = eRangedAttackState.Aim;
 
-            if (_owner.rangeAttackComponent.RangedAttackType is eRangedAttackType.Long)
-                (EffectListService.GetEffectOnTarget(_owner, eEffect.TrueShot) as TrueShotECSGameEffect)?.Cancel(true);
+            if (_owner.effectListComponent.ContainsEffectForEffectType(eEffect.SureShot))
+                _owner.rangeAttackComponent.RangedAttackType = eRangedAttackType.SureShot;
+            else if (_owner.effectListComponent.ContainsEffectForEffectType(eEffect.RapidFire))
+                _owner.rangeAttackComponent.RangedAttackType = eRangedAttackType.RapidFire;
+            else if (_owner.effectListComponent.ContainsEffectForEffectType(eEffect.TrueShot))
+                _owner.rangeAttackComponent.RangedAttackType = eRangedAttackType.Long;
             else
-            {
                 _owner.rangeAttackComponent.RangedAttackType = eRangedAttackType.Normal;
 
-                if (_owner.effectListComponent.ContainsEffectForEffectType(eEffect.SureShot))
-                    _owner.rangeAttackComponent.RangedAttackType = eRangedAttackType.SureShot;
-                else if (_owner.effectListComponent.ContainsEffectForEffectType(eEffect.RapidFire))
-                    _owner.rangeAttackComponent.RangedAttackType = eRangedAttackType.RapidFire;
-                else if (_owner.effectListComponent.ContainsEffectForEffectType(eEffect.TrueShot))
-                    _owner.rangeAttackComponent.RangedAttackType = eRangedAttackType.Long;
-            }
 
             // Must be done after changing `RangedAttackType`.
             _interval = AttackComponent.AttackSpeed(_weapon);

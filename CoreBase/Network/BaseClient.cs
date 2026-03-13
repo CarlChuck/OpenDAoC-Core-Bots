@@ -23,9 +23,9 @@ namespace DOL.Network
         private long _isReceivingAsyncCompleted; // Use `ReceivingAsyncCompleted` instead.
 
         public Socket Socket { get; }
-        public byte[] ReceiveBuffer { get; }
-        public int ReceiveBufferOffset { get; set; }
         public SessionId SessionId { get; private set; }
+        protected byte[] ReceiveBuffer { get; }
+        protected int ReceiveBufferOffset { get; set; }
 
         private bool ReceivingAsyncCompleted
         {
@@ -70,7 +70,10 @@ namespace DOL.Network
             SessionId = sessionId;
         }
 
-        protected virtual void OnDisconnect() { }
+        protected virtual void OnDisconnect()
+        {
+            SessionId.Dispose();
+        }
 
         public bool SendAsync(SocketAsyncEventArgs tcpSendArgs)
         {
@@ -159,7 +162,6 @@ namespace DOL.Network
         public void Disconnect()
         {
             _receiveArgs.Dispose();
-            SessionId.Dispose();
 
             try
             {

@@ -1,3 +1,5 @@
+using DOL.AI;
+
 namespace DOL.GS
 {
 	/// <summary>
@@ -5,7 +7,7 @@ namespace DOL.GS
 	/// </summary>		
 	public abstract class GameMovingObject : GameNPC
 	{
-		public GameMovingObject() : base()
+		public GameMovingObject(ABrain defaultBrain) : base(defaultBrain)
 		{
 		}
 
@@ -35,7 +37,7 @@ namespace DOL.GS
 			}
 		}
 
-		public override bool IsWorthReward => false;
+		public override RewardEligibility RewardStatus => RewardEligibility.DeniedInvalid;
 
 		/// <summary>
 		/// This methode is override to remove XP system

@@ -1,8 +1,9 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using DOL.Database;
 using DOL.GS.PacketHandler;
+using DOL.GS.RealmAbilities;
 using DOL.GS.Spells;
 using DOL.GS.Styles;
 
@@ -111,11 +112,21 @@ namespace DOL.GS
             else
                 ShowAttackAnimation(mainHandAttackData, _attackWeapon);
 
-            // Mobs' heading isn't updated after they start attacking, so we update it after they swing.
-            if (_owner is GameNPC npcOwner)
-                npcOwner.TurnTo(mainHandAttackData.Target);
+            if (_owner.HasAbilityType(typeof(AtlasOF_PreventFlight)) &&
+                Util.Chance(35) &&
+                _target is GameLiving livingTarget &&
+                _owner.IsObjectInFront(livingTarget, 120) &&
+                livingTarget.IsMoving &&
+                livingTarget.GetAngle(_owner) is >= 150 and < 210)
+            {
+                Spell spell = SkillBase.GetSpellByID(7083);
 
-            return;
+                if (spell != null)
+                {
+                    ISpellHandler spellHandler = ScriptMgr.CreateSpellHandler(_owner, spell, SkillBase.GetSpellLine(GlobalSpellsLines.Reserved_Spells));
+                    spellHandler?.StartSpell(livingTarget);
+                }
+            }
         }
 
         public void ShowAttackAnimation(AttackData ad, DbInventoryItem weapon)
@@ -400,7 +411,8 @@ namespace DOL.GS
 
                 foreach (ECSGameSpellEffect damageAdd in regularDamageAdds)
                 {
-                    (damageAdd.SpellHandler as DamageAddSpellHandler).Handle(ad, numRegularDmgAddsApplied > 0 ? 0.5 : 1.0);
+                    double effectiveness = damageAdd.Effectiveness * Math.ScaleB(1.0, -numRegularDmgAddsApplied);
+                    (damageAdd.SpellHandler as DamageAddSpellHandler).Handle(ad, effectiveness);
                     numRegularDmgAddsApplied++;
                 }
             }
@@ -418,7 +430,8 @@ namespace DOL.GS
                 if (!damageShield.IsActive)
                     continue;
 
-                (damageShield.SpellHandler as DamageShieldSpellHandler).Handle(ad, 1);
+                double effectiveness = damageShield.Effectiveness;
+                (damageShield.SpellHandler as DamageShieldSpellHandler).Handle(ad, effectiveness);
             }
         }
 
@@ -436,11 +449,11 @@ namespace DOL.GS
                 case eAttackResult.Parried:
                 {
                     int attackSpeed = target.AttackSpeed(target.ActiveWeapon);
-                    WeaponAction weaponAction = new(target, attacker, target.ActiveWeapon, null, target.Effectiveness, attackSpeed, null);
+                    WeaponAction weaponAction = new(target, attacker, target.ActiveWeapon, null, 1.0, attackSpeed, null);
                     // Don't call `WeaponAction.Execute` here.
                     // It applies damage adds and shields, but Reflex Attack shouldn't trigger them.
                     // It would also cause a stack overflow if the target has Reflex Attack too.
-                    AttackData ReflexAttackAD = target.attackComponent.LivingMakeAttack(weaponAction, attacker, target.ActiveWeapon, null, target.Effectiveness, attackSpeed, false, true);
+                    AttackData ReflexAttackAD = target.attackComponent.LivingMakeAttack(weaponAction, attacker, target.ActiveWeapon, null, 1.0, attackSpeed, false, true);
                     target.DealDamage(ReflexAttackAD);
 
                     // If we get hit by Reflex Attack (it can miss), send a "you were hit" message to the attacker manually

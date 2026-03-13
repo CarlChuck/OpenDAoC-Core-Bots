@@ -195,7 +195,7 @@ namespace DOL.GS.PacketHandler
         PositionUpdate = 0xA9,               // 0x01 ^ 168
         SellRequest = 0x79,                  // 0xD1 ^ 168
         SetMarketPrice = 0x1A,               // 0xB2 ^ 168
-        TrainHandlerOld = 0x7C,              // 0xD4 ^ 168
+        ChampionTrainHandler = 0x7C,         // 0xD4 ^ 168
         TrainHandler = 0x53,                 // 0xFB ^ 168
         TrainWindowHandler = 0x7B,           // 0xD3 ^ 168
         WithDrawMerchantMoney = 0x1C,        // 0xB4 ^ 168
@@ -626,6 +626,7 @@ namespace DOL.GS.PacketHandler
         void SendUDPInitReply();
         void SendTime();
         void SendMessage(string msg, eChatType type, eChatLoc loc);
+        void SendRawMessage(string msg, eChatType type, eChatLoc loc);
         void SendPlayerCreate(GamePlayer playerToCreate);
         void SendObjectGuildID(GameObject obj, Guild guild);
         void SendPlayerQuit(bool totalOut);
@@ -662,7 +663,7 @@ namespace DOL.GS.PacketHandler
                            bool autoWrapText, string message);
 
         void SendCustomDialog(string msg, CustomDialogResponse callback);
-        bool SendCheckLos(GameObject source, GameObject target, CheckLosResponse callback);
+        bool SendLosCheckRequest(GameObject source, GameObject target, ILosCheckListener listener);
         void SendGuildLeaveCommand(GamePlayer invitingPlayer, string inviteMessage);
         void SendGuildInviteCommand(GamePlayer invitingPlayer, string inviteMessage);
         void SendQuestOfferWindow(GameNPC questNPC, GamePlayer player, RewardQuest quest);
@@ -717,7 +718,7 @@ namespace DOL.GS.PacketHandler
         void SendConcentrationList();
         void SendUpdateCraftingSkills();
         void SendChangeTarget(GameObject newTarget);
-        void SendChangeGroundTarget(Point3D newTarget);
+        void SendChangeGroundTarget(int x, int y, int z);
         void SendPetWindow(GameLiving pet, ePetWindowAction windowAction, eAggressionState aggroState, eWalkState walkState);
         void SendPlaySound(eSoundType soundType, ushort soundID);
         void SendNPCsQuestEffect(GameNPC npc, eQuestIndicator indicator);

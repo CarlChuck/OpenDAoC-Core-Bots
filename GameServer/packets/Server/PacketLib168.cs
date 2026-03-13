@@ -9,12 +9,14 @@ using DOL.Database;
 using DOL.GS.Effects;
 using DOL.GS.Housing;
 using DOL.GS.Keeps;
+using DOL.GS.PacketHandler.Client.v168;
 using DOL.GS.PlayerTitles;
 using DOL.GS.Quests;
 using DOL.GS.RealmAbilities;
 using DOL.GS.ServerProperties;
 using DOL.GS.Styles;
 using DOL.Language;
+using DOL.Logging;
 using DOL.Network;
 
 namespace DOL.GS.PacketHandler
@@ -28,7 +30,7 @@ namespace DOL.GS.PacketHandler
 		/// <summary>
 		/// Defines a logger for this class.
 		/// </summary>
-		private static readonly Logging.Logger log = Logging.LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
+		private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
 
 		/// <summary>
 		/// Constructs a new PacketLib for Version 1.68 clients
@@ -623,6 +625,12 @@ namespace DOL.GS.PacketHandler
 			}
 		}
 
+		public virtual void SendRawMessage(string msg, eChatType type, eChatLoc loc)
+		{
+			// Unsupported.
+			SendMessage(msg, type, loc);
+		}
+
 		public virtual void SendPlayerCreate(GamePlayer playerToCreate)
 		{
 			if (playerToCreate == null)
@@ -734,7 +742,7 @@ namespace DOL.GS.PacketHandler
 			ushort heading;
 			ushort targetZoneSkinId = 0;
 			byte flags = 0;
-			int targetOID = 0;
+			int targetId = 0;
 
 			if (obj is not GameNPC npc)
 			{
@@ -799,12 +807,12 @@ namespace DOL.GS.PacketHandler
 					}
 				}
 
-				// `targetOID` does three things:
+				// `targetId` does three things:
 				// * Enables the NPC's attack state if > 0.
-				// * Client side, forces the NPC to face the object having this ID at all time, and walk towards if it has any speed (incompatible with pathing).
+				// * Client side, forces the NPC to face the object having this ID at all time, and walk towards if it has any speed (incompatible with pathfinding).
 				// * Prevents the NPC from overshooting the target, which for some reason seems to prevent smooth movement when the target is close (very janky).
 				// So if we simply pass the target's ID, things won't look good.
-				// We want to enable the attack state even if pathing is enabled and the npc is far away, and we want to have smooth movements at close range.
+				// We want to enable the attack state even if pathfinding is enabled and the npc is far away, and we want to have smooth movements at close range.
 				// We obviously also want the NPC to face it's target at all time, if possible.
 				// To achieve this, we pass the real object ID if the NPC isn't moving and is close enough to attack, otherwise we pass an unused object ID.
 				// 65535 should be safe, since regions can't hold that many objects by default.
@@ -814,9 +822,9 @@ namespace DOL.GS.PacketHandler
 					GameObject target = npc.TargetObject;
 
 					if (target?.ObjectState is GameObject.eObjectState.Active && npc.CurrentSpeed == 0 && npc.IsWithinRadius(target, npc.attackComponent.AttackRange))
-						targetOID = target.ObjectID;
+						targetId = target.ObjectID;
 					else
-						targetOID = 65535;
+						targetId = 65535;
 				}
 			}
 
@@ -844,7 +852,7 @@ namespace DOL.GS.PacketHandler
 				pak.WriteShort(z);
 				pak.WriteShort(zOffsetInTargetZone);
 				pak.WriteShort(obj.ObjectID);
-				pak.WriteShort((ushort) targetOID);
+				pak.WriteShort((ushort) targetId);
 
 				if (obj is GameLiving)
 					pak.WriteByte((obj as GameLiving).HealthPercent);
@@ -1060,30 +1068,46 @@ namespace DOL.GS.PacketHandler
 						add += "-NON"; // indicates NON flag for GMs
 				}
 
-                string name = npc.Name;
-                string guildName = npc.GuildName;
+				string name = npc.Name;
+				string guildName = npc.GuildName;
 
-                LanguageDataObject translation = LanguageMgr.GetTranslation(m_gameClient, npc);
-                if (translation != null)
-                {
-                    if(!string.IsNullOrEmpty(((DbLanguageGameNpc)translation).Name))
-                        name = ((DbLanguageGameNpc)translation).Name;
+				LanguageDataObject translation = LanguageMgr.GetTranslation(m_gameClient, npc);
+				if (translation != null)
+				{
+					if (!string.IsNullOrEmpty(((DbLanguageGameNpc)translation).Name))
+						name = ((DbLanguageGameNpc)translation).Name;
 
-                    if (!string.IsNullOrEmpty(((DbLanguageGameNpc)translation).GuildName))
-                        guildName = ((DbLanguageGameNpc)translation).GuildName;
-                }
+					if (!string.IsNullOrEmpty(((DbLanguageGameNpc)translation).GuildName))
+						guildName = ((DbLanguageGameNpc)translation).GuildName;
+				}
 
-                if (name.Length + add.Length + 2 > 47) // clients crash with too long names
-                    name = name.Substring(0, 47 - add.Length - 2);
-                if (add.Length > 0)
-                    name = string.Format("[{0}]{1}", name, add);
+				ReadOnlySpan<char> nameSpan = name;
+				int maxNameLength = 47 - add.Length - 2;
 
-                pak.WritePascalString(name);
+				if (nameSpan.Length > maxNameLength)
+					nameSpan = nameSpan[..maxNameLength];
 
-                if (guildName.Length > 47)
-                    guildName = guildName.Substring(0, 47);
+				if (add.Length > 0)
+				{
+					Span<char> buffer = stackalloc char[1 + nameSpan.Length + 1 + add.Length];
+					int pos = 0;
+					buffer[pos++] = '[';
+					nameSpan.CopyTo(buffer[pos..]);
+					pos += nameSpan.Length;
+					buffer[pos++] = ']';
+					add.AsSpan().CopyTo(buffer[pos..]);
+					pos += add.Length;
+					pak.WritePascalString(buffer[..pos]);
+				}
+				else
+					pak.WritePascalString(nameSpan);
 
-                pak.WritePascalString(guildName);
+				ReadOnlySpan<char> guildSpan = guildName;
+
+				if (guildSpan.Length > 47)
+					guildSpan = guildSpan[..47];
+
+				pak.WritePascalString(guildSpan);
 
 				pak.WriteByte(0x00);
 				SendTCP(pak);
@@ -1192,8 +1216,7 @@ namespace DOL.GS.PacketHandler
 				ushort maxSpeedPercent = (ushort) m_gameClient.Player.movementComponent.MaxSpeedPercent;
 				pak.WriteShort(maxSpeedPercent);
 				pak.WriteByte((byte) (m_gameClient.Player.IsTurningDisabled ? 0x01 : 0x00));
-				// water speed in % of land speed if its over 0 i think
-				pak.WriteByte((byte) Math.Min(byte.MaxValue, maxSpeedPercent * m_gameClient.Player.GetModified(eProperty.WaterSpeed) * 0.01));
+				pak.WriteByte((byte) m_gameClient.Player.GetModified(eProperty.WaterSpeed));
 				SendTCP(pak);
 			}
 		}
@@ -1359,6 +1382,8 @@ namespace DOL.GS.PacketHandler
 				pak.WriteByte(0x00);
 				SendTCP(pak);
 			}
+
+			m_gameClient.Player.TempProperties.SetProperty(DialogResponseHandler.GROUP_INVITE_KEY, invitingPlayer.Name);
 		}
 
 		public virtual void SendGuildInviteCommand(GamePlayer invitingPlayer, string inviteMessage)
@@ -1367,7 +1392,7 @@ namespace DOL.GS.PacketHandler
 			{
 				pak.WriteByte(0x00);
 				pak.WriteByte(0x03);
-				pak.WriteShort(invitingPlayer.ObjectID); //data1
+				pak.WriteShort(invitingPlayer.Client.SessionID); //data1
 				pak.Fill(0x00, 6); //data2&data3
 				pak.WriteByte(0x01);
 				pak.WriteByte(0x00);
@@ -1376,6 +1401,8 @@ namespace DOL.GS.PacketHandler
 				pak.WriteByte(0x00);
 				SendTCP(pak);
 			}
+
+			m_gameClient.Player.TempProperties.SetProperty(DialogResponseHandler.GUILD_INVITE_KEY, invitingPlayer.Name);
 		}
 
 		public virtual void SendGuildLeaveCommand(GamePlayer invitingPlayer, string inviteMessage)
@@ -1510,12 +1537,12 @@ namespace DOL.GS.PacketHandler
 			}
 		}
 
-		public virtual bool SendCheckLos(GameObject source, GameObject target, CheckLosResponse callback)
+		public virtual bool SendLosCheckRequest(GameObject source, GameObject target, ILosCheckListener listener)
 		{
-			if (m_gameClient.ClientState is not GameClient.eClientState.Playing || source == null || target == null)
+			if (m_gameClient.ClientState is not GameClient.eClientState.Playing)
 				return false;
 
-			return m_gameClient.Player.LosCheckHandler.StartLosCheck(source, target, callback);
+			return m_gameClient.Player.LosCheckHandler.StartLosCheck(source, target, listener);
 		}
 
 		public virtual void SendQuestListUpdate()
@@ -2088,7 +2115,7 @@ namespace DOL.GS.PacketHandler
 				return;
 
 			// Get Skills as "Usable Skills" which are in network order ! (with forced update)
-			List<Tuple<Skill, Skill>> usableSkills = m_gameClient.Player.GetAllUsableSkills(updateInternalCache);
+			var usableSkills = m_gameClient.Player.GetAllUsableSkills(updateInternalCache);
 
 			bool sent = false; // set to true once we can't send packet anymore !
 			int index = 0; // index of our position in the list !
@@ -2250,7 +2277,7 @@ namespace DOL.GS.PacketHandler
 			if (player == null)
 				return;
 
-			List<Tuple<SpellLine, List<Skill>>> spellsXLines = player.GetAllUsableListSpells(true);
+			var spellsXLines = player.GetAllUsableListSpells(true);
 
 			int lineIndex = 0;
 			foreach (var spXsl in spellsXLines)
@@ -2335,7 +2362,7 @@ namespace DOL.GS.PacketHandler
 				pak.WriteByte((byte) (wd % 256));
 				pak.WritePascalString(" ");
 				// weaponskill
-				int ws = m_gameClient.Player.DisplayedWeaponSkill;
+				int ws = m_gameClient.Player.GetDisplayedWeaponSkill();
 				pak.WriteByte((byte) (ws >> 8));
 				pak.WritePascalString(" ");
 				pak.WriteByte((byte) (ws & 0xff));
@@ -2371,13 +2398,12 @@ namespace DOL.GS.PacketHandler
 
 			using (var pak = PooledObjectFactory.GetForTick<GSTCPPacketOut>().Init(GetPacketCode(eServerPackets.DetailWindow)))
 			{
-				if (caption == null)
-					caption = string.Empty;
+				ReadOnlySpan<char> captionSpan = caption == null ? [] : caption;
 
-				if (caption.Length > byte.MaxValue)
-					caption = caption.Substring(0, byte.MaxValue);
+				if (captionSpan.Length > byte.MaxValue)
+					captionSpan = captionSpan[..byte.MaxValue];
 
-				pak.WritePascalString(caption); //window caption
+				pak.WritePascalString(captionSpan);
 
 				WriteCustomTextWindowData(pak, text);
 
@@ -2433,7 +2459,14 @@ namespace DOL.GS.PacketHandler
 				pak.WriteShort((ushort) seconds);
 				pak.WriteByte((byte) title.Length);
 				pak.WriteByte(1);
-				pak.WriteString((title.Length > byte.MaxValue ? title.Substring(0, byte.MaxValue) : title));
+
+				ReadOnlySpan<char> titleSpan = title == null ? [] : title;
+
+				if (titleSpan.Length > byte.MaxValue)
+					titleSpan = titleSpan[..byte.MaxValue];
+
+				pak.WriteString(titleSpan);
+
 				SendTCP(pak);
 			}
 		}
@@ -2901,21 +2934,31 @@ namespace DOL.GS.PacketHandler
 					pak.WriteByte(0); // unknown
 					pak.WriteByte(effect.Concentration);
 					pak.WriteShort(effect.Icon);
-
-					if (effect.Name.Length > 14)
-						pak.WritePascalString(effect.Name.Substring(0, 12) + "..");
-					else
-						pak.WritePascalString(effect.Name);
-					if (effect.OwnerName.Length > 14)
-						pak.WritePascalString(effect.OwnerName.Substring(0, 12) + "..");
-					else
-						pak.WritePascalString(effect.OwnerName);
+					WriteTruncatedName(pak, effect.Name);
+					WriteTruncatedName(pak, effect.OwnerName);
 				}
 
 				SendTCP(pak);
 			}
 
 			SendStatusUpdate();
+
+			static void WriteTruncatedName(GSTCPPacketOut pak, ReadOnlySpan<char> text)
+			{
+				const int MAX_LENGTH = 14;
+				const int TRUNCATE_LENGTH = 12;
+
+				if (text.Length > MAX_LENGTH)
+				{
+					Span<char> buffer = stackalloc char[MAX_LENGTH];
+					text[..TRUNCATE_LENGTH].CopyTo(buffer);
+					buffer[12] = '.';
+					buffer[13] = '.';
+					pak.WritePascalString(buffer);
+				}
+				else
+					pak.WritePascalString(text);
+			}
 		}
 
 		public void SendChangeTarget(GameObject newTarget)
@@ -2928,13 +2971,27 @@ namespace DOL.GS.PacketHandler
 			}
 		}
 
-		public void SendChangeGroundTarget(Point3D newTarget)
+		public void SendChangeGroundTarget(int x, int y, int z)
 		{
+			if (x < 0)
+				throw new ArgumentOutOfRangeException(nameof(x), x, "Coordinate must be positive.");
+
+			if (y < 0)
+				throw new ArgumentOutOfRangeException(nameof(y), y, "Coordinate must be positive.");
+
+			if (z < 0)
+				throw new ArgumentOutOfRangeException(nameof(z), z, "Coordinate must be positive.");
+
+			// 1.127.
+			// If the position is too far away, the client will print "You attempt a GroundAssist, but the target is out of Range!".
+			// If it's in range, it will print "Your ground target has been set with GroundAssist."
+			// This means this shouldn't be used to force the ground target except when /groundassist is used.
+
 			using (var pak = PooledObjectFactory.GetForTick<GSTCPPacketOut>().Init(GetPacketCode(eServerPackets.ChangeGroundTarget)))
 			{
-				pak.WriteInt((uint) (newTarget == null ? 0 : newTarget.X));
-				pak.WriteInt((uint) (newTarget == null ? 0 : newTarget.Y));
-				pak.WriteInt((uint) (newTarget == null ? 0 : newTarget.Z));
+				pak.WriteInt((uint) x);
+				pak.WriteInt((uint) y);
+				pak.WriteInt((uint) z);
 				SendTCP(pak);
 			}
 		}
@@ -3173,7 +3230,7 @@ namespace DOL.GS.PacketHandler
 				pak.WriteByte(0x00);
 				pak.WriteByte(0x00);
 				pak.WriteByte((byte) house.Model);
-				pak.WriteByte(0x00);
+				pak.WriteByte((byte) house.DoorMaterial);
 				pak.WriteByte(0x00);
 				pak.WriteByte(0x00);
 				pak.WriteByte((byte) house.Rug1Color);
@@ -3431,22 +3488,24 @@ namespace DOL.GS.PacketHandler
 				return;
 			using (var pak = PooledObjectFactory.GetForTick<GSTCPPacketOut>().Init(GetPacketCode(eServerPackets.SiegeWeaponAnimation)))
 			{
-				pak.WriteInt((uint) siegeWeapon.ObjectID);
+				bool isGroundTargetValid = siegeWeapon.GroundTarget.IsValid;
+
+				pak.WriteInt(siegeWeapon.ObjectID);
 				pak.WriteInt(
 					(uint)
 					(siegeWeapon.TargetObject == null
-					 ? (siegeWeapon.GroundTarget == null ? 0 : siegeWeapon.GroundTarget.X)
-					 : siegeWeapon.TargetObject.X));
+						? (!isGroundTargetValid ? 0 : siegeWeapon.GroundTarget.X)
+						: siegeWeapon.TargetObject.X));
 				pak.WriteInt(
 					(uint)
 					(siegeWeapon.TargetObject == null
-					 ? (siegeWeapon.GroundTarget == null ? 0 : siegeWeapon.GroundTarget.Y)
-					 : siegeWeapon.TargetObject.Y));
+						? (!isGroundTargetValid ? 0 : siegeWeapon.GroundTarget.Y)
+						: siegeWeapon.TargetObject.Y));
 				pak.WriteInt(
 					(uint)
 					(siegeWeapon.TargetObject == null
-					 ? (siegeWeapon.GroundTarget == null ? 0 : siegeWeapon.GroundTarget.Z)
-					 : siegeWeapon.TargetObject.Z));
+						? (!isGroundTargetValid ? 0 : siegeWeapon.GroundTarget.Z)
+						: siegeWeapon.TargetObject.Z));
 				pak.WriteInt((uint) (siegeWeapon.TargetObject == null ? 0 : siegeWeapon.TargetObject.ObjectID));
 				pak.WriteShort(siegeWeapon.Effect);
 				pak.WriteShort((ushort) (siegeWeapon.SiegeWeaponTimer.TimeUntilElapsed/100));
@@ -3800,25 +3859,20 @@ namespace DOL.GS.PacketHandler
 				}
 				else
 				{
-					string name = quest.Name;
-					string desc = quest.Description;
-					if (name.Length > byte.MaxValue)
-					{
-						if (log.IsWarnEnabled)
-							log.Warn(quest.GetType() + ": name is too long for 1.68+ clients (" + name.Length + ") '" + name + "'");
-						name = name.Substring(0, byte.MaxValue);
-					}
-					if (desc.Length > byte.MaxValue)
-					{
-						if (log.IsWarnEnabled)
-							log.Warn(quest.GetType() + ": description is too long for 1.68+ clients (" + desc.Length + ") '" + desc + "'");
-						desc = desc.Substring(0, byte.MaxValue);
-					}
-					pak.WriteByte((byte) name.Length);
-					pak.WriteByte((byte) desc.Length);
+					ReadOnlySpan<char> nameSpan = quest.Name;
+					ReadOnlySpan<char> descSpan = quest.Description;
+
+					if (nameSpan.Length > byte.MaxValue)
+						nameSpan = nameSpan[..byte.MaxValue];
+
+					if (descSpan.Length > byte.MaxValue)
+						descSpan = descSpan[..byte.MaxValue];
+
+					pak.WriteByte((byte) nameSpan.Length);
+					pak.WriteByte((byte) descSpan.Length);
 					pak.WriteByte(0);
-					pak.WriteStringBytes(name); //Write Quest Name without trailing 0
-					pak.WriteStringBytes(desc); //Write Quest Description without trailing 0
+					pak.WriteNonNullTerminatedString(nameSpan); //Write Quest Name without trailing 0
+					pak.WriteNonNullTerminatedString(descSpan); //Write Quest Description without trailing 0
 				}
 
 				SendTCP(pak);
@@ -4049,18 +4103,17 @@ namespace DOL.GS.PacketHandler
 
 			foreach (var listStr in text)
 			{
-				string str = listStr;
-
-				if (str != null)
+				if (listStr != null)
 				{
 					if (pak.Position + 4 > MAX_PACKET_LENGTH) // line + pascalstringline(1) + trailingZero
 						return;
 
 					pak.WriteByte(++line);
+					ReadOnlySpan<char> str = listStr.AsSpan();
 
 					while (str.Length > byte.MaxValue)
 					{
-						string s = str.Substring(0, byte.MaxValue);
+						ReadOnlySpan<char> s = str[..byte.MaxValue];
 
 						if (pak.Position + s.Length + 2 > MAX_PACKET_LENGTH)
 						{
@@ -4069,7 +4122,8 @@ namespace DOL.GS.PacketHandler
 						}
 
 						pak.WritePascalString(s);
-						str = str.Substring(byte.MaxValue, str.Length - byte.MaxValue);
+						str = str[byte.MaxValue..];
+
 						if (line >= 200 || pak.Position + Math.Min(byte.MaxValue, str.Length) + 2 >= MAX_PACKET_LENGTH)
 							// line + pascalstringline(1) + trailingZero
 							return;
@@ -4079,7 +4133,7 @@ namespace DOL.GS.PacketHandler
 
 					if (pak.Position + str.Length + 2 > MAX_PACKET_LENGTH) // str.Length + trailing zero
 					{
-						str = str.Substring(0, (int)Math.Max(Math.Min(1, str.Length), MAX_PACKET_LENGTH - pak.Position - 2));
+						str = str[..(int) Math.Max(Math.Min(1, str.Length), MAX_PACKET_LENGTH - pak.Position - 2)];
 						needBreak = true;
 					}
 

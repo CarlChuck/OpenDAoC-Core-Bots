@@ -161,12 +161,11 @@ namespace DOL.AI.Brain
 					spell.Message4 = "The destructive energy around {0} fades.";
 					spell.Range = 1500;
 					spell.SpellID = 12006;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DamageOverTime.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_KelicDD = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_KelicDD);
 				}
 				return m_KelicDD;
 			}
@@ -194,13 +193,12 @@ namespace DOL.AI.Brain
 					spell.Range = 1500;
 					spell.Duration = 120;
 					spell.SpellID = 12008;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "Disease";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Energy; //Energy DMG Type
 					m_KelicDisease = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_KelicDisease);
 				}
 				return m_KelicDisease;
 			}
@@ -226,11 +224,10 @@ namespace DOL.AI.Brain
 					spell.Message2 = "{0}'s feet are frozen to the ground!";
 					spell.Range = 1500;
 					spell.SpellID = 12009;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.SpeedDecrease.ToString();
 					spell.Uninterruptible = true;
 					m_KelicRoot = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_KelicRoot);
 				}
 				return m_KelicRoot;
 			}

@@ -6,12 +6,13 @@ using DOL.Events;
 using DOL.GS.Effects;
 using DOL.GS.PacketHandler;
 using DOL.Language;
+using DOL.Logging;
 
 namespace DOL.GS.Spells
 {
     public abstract class BaseProcSpellHandler : SpellHandler
     {
-        private static readonly Logging.Logger log = Logging.LoggerManager.Create(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly Logger log = LoggerManager.Create(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         protected readonly SpellLine _buffSpellLine;
         protected readonly Spell _procSpell;
@@ -23,6 +24,15 @@ namespace DOL.GS.Spells
         {
             _buffSpellLine = spellLine;
             _procSpell = SkillBase.GetSpellByID((int) spell.Value);
+
+            if (_procSpell == null)
+                return;
+
+            _procSpell.Level = spell.Level; // Inherit the buff's level.
+
+            // Scale the proc here, since it cannot be scaled on NPC initialization.
+            if (caster is GameNPC npc)
+                _procSpell = npc.GetScaledSpell(_procSpell);
         }
 
         public override ECSGameSpellEffect CreateECSEffect(in ECSGameEffectInitParams initParams)
@@ -32,7 +42,7 @@ namespace DOL.GS.Spells
             // If they're different, we can't really use the buff spell line, so we use the item effects spell line as a way to reduce variance.
             // Ideally, proc spells should use the buff spell line and the caster's specialization, stats, RAs, etc. But this isn't currently supported.
             _procSpellLine = initParams.Target == Caster ? _buffSpellLine : SkillBase.GetSpellLine(GlobalSpellsLines.Item_Effects);
-            return ECSGameEffectFactory.Create(initParams, static (in ECSGameEffectInitParams i) => new ProcECSGameEffect(i));
+            return ECSGameEffectFactory.Create(initParams, static (in i) => new ProcECSGameEffect(i));
         }
 
         protected abstract void EventHandler(DOLEvent e, object sender, EventArgs arguments);
@@ -179,6 +189,16 @@ namespace DOL.GS.Spells
     [SpellHandler(eSpellType.OffensiveProc)]
     public class OffensiveProcSpellHandler : BaseProcSpellHandler
     {
+        public override string ShortDescription
+        {
+            get
+            {
+                ISpellHandler subSpell = ScriptMgr.CreateSpellHandler(m_caster, SkillBase.GetSpellByID((int)Spell.Value), null);
+                return $"Triggers the following spell with a {Spell.Frequency / 100}% chance on own melee attacks:\n\n" +
+                    (subSpell != null ? subSpell.ShortDescription : $"Spell with ID {Spell.Value} not found.");
+            }
+        }
+
         protected override DOLEvent EventType => GameLivingEvent.AttackFinished;
 
         public OffensiveProcSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
@@ -192,27 +212,25 @@ namespace DOL.GS.Spells
 
             int baseChance = Spell.Frequency / 100;
 
-            if (Util.Chance(baseChance))
+            if (!Caster.Chance(RandomDeckEvent.OffensiveProcChance, baseChance))
+                return;
+
+            ISpellHandler handler = ScriptMgr.CreateSpellHandler(ad.Attacker, _procSpell, _procSpellLine);
+
+            if (handler == null)
+                return;
+
+            switch (_procSpell.Target)
             {
-                ISpellHandler handler = ScriptMgr.CreateSpellHandler(ad.Attacker, _procSpell, _procSpellLine);
-
-                if (handler != null)
+                case eSpellTarget.ENEMY:
                 {
-                    handler.Spell.Level = Spell.Level;
-
-                    switch (_procSpell.Target)
-                    {
-                        case eSpellTarget.ENEMY:
-                        {
-                            handler.StartSpell(ad.Target);
-                            break;
-                        }
-                        default:
-                        {
-                            handler.StartSpell(ad.Attacker);
-                            break;
-                        }
-                    }
+                    handler.StartSpell(ad.Target);
+                    break;
+                }
+                default:
+                {
+                    handler.StartSpell(ad.Attacker);
+                    break;
                 }
             }
         }
@@ -222,6 +240,16 @@ namespace DOL.GS.Spells
     public class DefensiveProcSpellHandler : BaseProcSpellHandler
     {
         protected override DOLEvent EventType => GameLivingEvent.AttackedByEnemy;
+
+        public override string ShortDescription
+        {
+            get
+            {
+                ISpellHandler subSpell = ScriptMgr.CreateSpellHandler(m_caster, SkillBase.GetSpellByID((int)Spell.Value), null);
+                return $"Triggers the following spell with a {Spell.Frequency / 100}% chance when being hit by melee attacks:\n\n" +
+                    (subSpell != null ? subSpell.ShortDescription : $"Spell with ID {Spell.Value} not found.");
+            }
+        }
 
         public DefensiveProcSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
 
@@ -234,25 +262,25 @@ namespace DOL.GS.Spells
 
             int baseChance = Spell.Frequency / 100;
 
-            if (Util.Chance(baseChance))
-            {
-                ISpellHandler handler = ScriptMgr.CreateSpellHandler(ad.Target, _procSpell, _procSpellLine);
+            if (!Caster.Chance(RandomDeckEvent.DefensiveProcChance, baseChance))
+                return;
 
-                if (handler != null)
+            ISpellHandler handler = ScriptMgr.CreateSpellHandler(ad.Target, _procSpell, _procSpellLine);
+
+            if (handler == null)
+                return;
+
+            switch (_procSpell.Target)
+            {
+                case eSpellTarget.ENEMY:
                 {
-                    switch (_procSpell.Target)
-                    {
-                        case eSpellTarget.ENEMY:
-                        {
-                            handler.StartSpell(ad.Attacker);
-                            break;
-                        }
-                        default:
-                        {
-                            handler.StartSpell(ad.Target);
-                            break;
-                        }
-                    }
+                    handler.StartSpell(ad.Attacker);
+                    break;
+                }
+                default:
+                {
+                    handler.StartSpell(ad.Target);
+                    break;
                 }
             }
         }

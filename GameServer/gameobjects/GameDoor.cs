@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using DOL.Database;
 using DOL.GS.PacketHandler;
 using DOL.Language;
@@ -12,11 +13,20 @@ namespace DOL.GS
         private const int STAYS_OPEN_DURATION = 5000;
         private const int REPAIR_INTERVAL = 30 * 1000;
 
-        public override bool CanBeOpenedViaInteraction => !Locked;
+        private static HashSet<int> _borderKeepDoorIds =
+        [
+            11020501, 11020502,
+            12000101, 12000102,
+            102093501, 102093502,
+            111161301, 111161302,
+            206016801, 206016802,
+            207156901, 207156902
+        ];
 
         private bool _openDead = false;
-        private ECSGameTimer _closeDoorAction;
-        private ECSGameTimer _repairTimer;
+        private CloseDoorAction _closeDoorAction;
+
+        public override bool CanBeOpenedViaInteraction => !Locked;
 
         public GameDoor() : base()
         {
@@ -32,7 +42,14 @@ namespace DOL.GS
             {
                 lock (_stateLock)
                 {
-                    _closeDoorAction ??= new CloseDoorAction(this);
+                    _closeDoorAction ??= new(this);
+
+                    // Don't extend the timer for border keep doors, otherwise players can block them.
+                    // The client doesn't send any interaction packet during the animation,
+                    // ensuring the door's state alternates between closed and open.
+                    if (IsBorderKeepDoor() && _closeDoorAction.IsAlive)
+                        return;
+
                     _closeDoorAction.Start(STAYS_OPEN_DURATION);
                 }
             }
@@ -81,17 +98,18 @@ namespace DOL.GS
 
         public override void StartHealthRegeneration()
         {
-            if ((_repairTimer != null && _repairTimer.IsAlive) || Health >= MaxHealth)
+            if (m_healthRegenerationTimer.IsAlive || Health >= MaxHealth)
                 return;
 
-            _repairTimer = new ECSGameTimer(this);
-            _repairTimer.Callback = new ECSGameTimer.ECSTimerCallback(RepairTimerCallback);
-            _repairTimer.Start(REPAIR_INTERVAL);
+            m_healthRegenerationTimer.Start(REPAIR_INTERVAL);
         }
 
-        private int RepairTimerCallback(ECSGameTimer timer)
+        protected override int HealthRegenerationTimerCallback(ECSGameTimer timer)
         {
-            if (HealthPercent != 100 && !InCombat)
+            if (HealthPercent >= 100)
+                return 0;
+
+            if (!InCombat)
             {
                 Health += MaxHealth / 100 * 5;
 
@@ -104,9 +122,6 @@ namespace DOL.GS
                 // This should normally be done by 'DoorMgr'.
                 // But for now it's here because basic doors aren't attackable anyway.
                 SaveIntoDatabase();
-
-                if (HealthPercent >= 100)
-                    return 0;
             }
 
             return REPAIR_INTERVAL;
@@ -115,37 +130,30 @@ namespace DOL.GS
         public override void TakeDamage(GameObject source, eDamageType damageType, int damageAmount, int criticalAmount)
         {
             if (!_openDead && Realm != eRealm.Door)
-            {
                 base.TakeDamage(source, damageType, damageAmount, criticalAmount);
-            }
 
-            GamePlayer attackerPlayer = source as GamePlayer;
+            if (source is not GamePlayer attackerPlayer || _openDead || Realm is eRealm.Door)
+                return;
 
-            if (attackerPlayer != null)
+            attackerPlayer.Out.SendMessage(LanguageMgr.GetTranslation(attackerPlayer.Client.Account.Language, "GameDoor.NowOpen", Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
+            Health -= damageAmount + criticalAmount;
+
+            if (IsAlive)
+                return;
+
+            attackerPlayer.Out.SendMessage(LanguageMgr.GetTranslation(attackerPlayer.Client.Account.Language, "GameDoor.NowOpen", Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
+            Die(source);
+            _openDead = true;
+
+            if (!Locked)
+                Open();
+
+            Group attackerGroup = attackerPlayer.Group;
+
+            if (attackerGroup != null)
             {
-                if (!_openDead && Realm != eRealm.Door)
-                {
-                    attackerPlayer.Out.SendMessage(LanguageMgr.GetTranslation(attackerPlayer.Client.Account.Language, "GameDoor.NowOpen", Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
-                    Health -= damageAmount + criticalAmount;
-
-                    if (!IsAlive)
-                    {
-                        attackerPlayer.Out.SendMessage(LanguageMgr.GetTranslation(attackerPlayer.Client.Account.Language, "GameDoor.NowOpen", Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
-                        Die(source);
-                        _openDead = true;
-
-                        if (!Locked)
-                            Open();
-
-                        Group attackerGroup = attackerPlayer.Group;
-
-                        if (attackerGroup != null)
-                        {
-                            foreach (GameLiving living in attackerGroup.GetMembersInTheGroup())
-                                ((GamePlayer) living)?.Out.SendMessage(LanguageMgr.GetTranslation(attackerPlayer.Client.Account.Language, "GameDoor.NowOpen", Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
-                        }
-                    }
-                }
+                foreach (GameLiving living in attackerGroup.GetMembersInTheGroup())
+                    (living as GamePlayer)?.Out.SendMessage(LanguageMgr.GetTranslation(attackerPlayer.Client.Account.Language, "GameDoor.NowOpen", Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
             }
         }
 
@@ -157,10 +165,20 @@ namespace DOL.GS
             {
                 lock (_stateLock)
                 {
-                    _closeDoorAction ??= new CloseDoorAction(this);
+                    _closeDoorAction ??= new(this);
                     _closeDoorAction.Start(STAYS_OPEN_DURATION);
                 }
             }
+        }
+
+        public bool IsBorderKeepDoor()
+        {
+            return IsBorderKeepDoor(DoorId);
+        }
+
+        public static bool IsBorderKeepDoor(int doorId)
+        {
+            return _borderKeepDoorIds.Contains(doorId);
         }
 
         private class CloseDoorAction : ECSGameTimerWrapperBase

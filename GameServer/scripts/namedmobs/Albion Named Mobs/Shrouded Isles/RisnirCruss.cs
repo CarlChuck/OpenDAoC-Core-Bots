@@ -197,7 +197,6 @@ namespace DOL.AI.Brain
 					spell.DamageType = (int)eDamageType.Energy;
 					spell.Uninterruptible = true;
 					m_Boss_PBAOE = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Boss_PBAOE);
 				}
 				return m_Boss_PBAOE;
 			}
@@ -222,13 +221,12 @@ namespace DOL.AI.Brain
 					spell.Radius = 450;
 					spell.Range = 1500;
 					spell.SpellID = 18914;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "Mesmerize";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Spirit;
 					m_Boss_Mezz = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Boss_Mezz);
 				}
 				return m_Boss_Mezz;
 			}

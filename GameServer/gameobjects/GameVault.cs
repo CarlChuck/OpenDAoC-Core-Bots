@@ -146,7 +146,7 @@ namespace DOL.GS
         /// <summary>
         /// List of items in the vault.
         /// </summary>
-        public virtual IList<DbInventoryItem> GetDbItems(GamePlayer player)
+        public virtual IEnumerable<DbInventoryItem> GetDbItems(GamePlayer player)
         {
             WhereClause filterBySlot = DB.Column("SlotPosition").IsGreaterOrEqualTo(FirstDbSlot).And(DB.Column("SlotPosition").IsLessOrEqualTo(LastDbSlot));
             return DOLDB<DbInventoryItem>.SelectObjects(DB.Column("OwnerID").IsEqualTo(GetOwner(player)).And(filterBySlot));
@@ -172,43 +172,16 @@ namespace DOL.GS
             if (fromSlot == toSlot)
                 return false;
 
-            bool fromHousing = GameInventoryObjectExtensions.IsHousingInventorySlot(fromSlot);
-            DbInventoryItem itemInFromSlot = null;
-
             lock (Lock)
             {
                 try
                 {
-                    // If this is a shift right click move, find the first available slot of either inventory.
-                    if (toSlot is eInventorySlot.GeneralHousing)
-                    {
-                        player.Inventory.Lock.Enter();
+                    player.Inventory.Lock.Enter();
 
-                        if (fromHousing)
-                        {
-                            if (!GetClientInventory(player).TryGetValue((int) fromSlot, out itemInFromSlot))
-                                return false;
+                    bool fromHousing = GameInventoryObjectExtensions.IsHousingInventorySlot(fromSlot);
+                    bool toHousingInitial = GameInventoryObjectExtensions.IsHousingInventorySlot(toSlot);
 
-                            toSlot = itemInFromSlot.IsStackable ?
-                                     player.Inventory.FindFirstPartiallyFullSlot(eInventorySlot.FirstBackpack, eInventorySlot.LastBackpack, itemInFromSlot) :
-                                     player.Inventory.FindFirstEmptySlot(eInventorySlot.FirstBackpack, eInventorySlot.LastBackpack);
-                        }
-                        else if (GameInventoryObjectExtensions.IsCharacterInventorySlot(fromSlot))
-                        {
-                            itemInFromSlot = player.Inventory.GetItem(fromSlot);
-
-                            if (itemInFromSlot == null)
-                                return false;
-
-                            toSlot = itemInFromSlot.IsStackable ?
-                                     GetFirstPartiallyFullClientSlot(player, itemInFromSlot) :
-                                     GetFirstEmptyClientSlot(player);
-                        }
-                    }
-
-                    bool toHousing = GameInventoryObjectExtensions.IsHousingInventorySlot(toSlot);
-
-                    if (!fromHousing && !toHousing)
+                    if (!fromHousing && !toHousingInitial && toSlot is not eInventorySlot.GeneralHousing)
                         return false;
 
                     if (player.ActiveInventoryObject is not GameVault gameVault)
@@ -218,42 +191,80 @@ namespace DOL.GS
                         return false;
                     }
 
-                    if (toHousing && !gameVault.CanAddItems(player))
-                    {
-                        player.Out.SendMessage("You don't have permission to add items!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
-                        return false;
-                    }
+                    // Get the item being moved from its source.
+                    DbInventoryItem itemInFromSlot = fromHousing ?
+                        GetClientInventory(player).GetValueOrDefault((int) fromSlot) :
+                        player.Inventory.GetItem(fromSlot);
 
-                    if (fromHousing && !gameVault.CanRemoveItems(player))
-                    {
-                        player.Out.SendMessage("You don't have permission to remove items!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+                    if (itemInFromSlot == null)
                         return false;
-                    }
 
-                    if (player.Client.Account.PrivLevel == 1)
+                    // Determine destination slot for shift right click moves.
+                    if (toSlot is eInventorySlot.GeneralHousing)
                     {
-                        // Check for a swap to get around not allowing non-tradeable items in a housing vault.
-                        if (fromHousing && this is not AccountVault)
+                        if (fromHousing)
                         {
-                            if (!player.Inventory.Lock.IsHeldByCurrentThread)
-                                player.Inventory.Lock.Enter();
+                            toSlot = itemInFromSlot.IsStackable ?
+                                player.Inventory.FindFirstPartiallyFullSlot(eInventorySlot.FirstBackpack, eInventorySlot.LastBackpack, itemInFromSlot) :
+                                player.Inventory.FindFirstEmptySlot(eInventorySlot.FirstBackpack, eInventorySlot.LastBackpack);
+                        }
+                        else // Moving from Player Inventory -> Vault
+                        {
+                            toSlot = itemInFromSlot.IsStackable ?
+                                GetFirstPartiallyFullClientSlot(player, itemInFromSlot) :
+                                GetFirstEmptyClientSlot(player);
+                        }
+                    }
 
-                            DbInventoryItem itemInToSlot = player.Inventory.GetItem(toSlot);
+                    bool toHousing = GameInventoryObjectExtensions.IsHousingInventorySlot(toSlot);
 
-                            if (itemInToSlot != null && !itemInToSlot.IsTradable)
-                            {
-                                player.Out.SendMessage("You cannot swap with an untradable item!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
-                                player.Out.SendInventoryItemsUpdate(null);
-                                return false;
-                            }
+                    // Get the item at the destination, if any.
+                    DbInventoryItem itemInToSlot = toHousing ?
+                        GetClientInventory(player).GetValueOrDefault((int) toSlot) :
+                        player.Inventory.GetItem(toSlot);
+
+                    if (toHousing)
+                    {
+                        if (!gameVault.CanAddItems(player))
+                        {
+                            player.Out.SendMessage("You don't have permission to add items!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+                            return false;
                         }
 
-                        // Allow people to get untradable items out of their house vaults (old bug) but block placing untradable items into housing vaults from any source.
-                        if (toHousing && this is not AccountVault)
+                        if (itemInToSlot != null && !gameVault.CanRemoveItems(player))
                         {
-                            if (itemInFromSlot != null && !itemInFromSlot.IsTradable)
+                            player.Out.SendMessage("You don't have permission to remove items!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+                            return false;
+                        }
+
+                        // Non-tradable item check.
+                        if (player.Client.Account.PrivLevel == 1 && this is not AccountVault && !itemInFromSlot.IsTradable)
+                        {
+                            player.Out.SendMessage("You can not put this untradable item into a house vault!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+                            player.Out.SendInventoryItemsUpdate(null);
+                            return false;
+                        }
+                    }
+                    else if (fromHousing)
+                    {
+                        if (!gameVault.CanRemoveItems(player))
+                        {
+                            player.Out.SendMessage("You don't have permission to remove items!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+                            return false;
+                        }
+
+                        if (itemInToSlot != null)
+                        {
+                            if (!gameVault.CanAddItems(player))
                             {
-                                player.Out.SendMessage("You can not put this item into a house vault!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+                                player.Out.SendMessage("You don't have permission to add items!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+                                return false;
+                            }
+
+                            // Non-tradable item check for the item being swapped in.
+                            if (player.Client.Account.PrivLevel == 1 && this is not AccountVault && !itemInToSlot.IsTradable)
+                            {
+                                player.Out.SendMessage("You cannot swap with an untradable item!", eChatType.CT_System, eChatLoc.CL_SystemWindow);
                                 player.Out.SendInventoryItemsUpdate(null);
                                 return false;
                             }
@@ -290,6 +301,11 @@ namespace DOL.GS
             return _itemCache.MoveItems(player, firstItem, previousFirstSlot, secondItem, previousSecondSlot);
         }
 
+        public virtual void OnItemManipulationError(GamePlayer player)
+        {
+            _itemCache.ForceValidateCache(player);
+        }
+
         public virtual bool SetSellPrice(GamePlayer player, eInventorySlot clientSlot, uint price)
         {
             return true;
@@ -322,7 +338,7 @@ namespace DOL.GS
 
         protected class ItemCache : ECSGameTimerWrapperBase
         {
-            private const int EXPIRES_AFTER = 600000;
+            private const int EXPIRES_AFTER = 30000;
 
             private readonly GameVault _vault;
             private Dictionary<int, DbInventoryItem> _items; // Uses client slots, not DB slots.
@@ -336,7 +352,7 @@ namespace DOL.GS
             {
                 lock (_vault.Lock)
                 {
-                    ValidateCache(player);
+                    ValidateCacheInternal(player);
                     int newSlot = GetClientSlotPosition(item.SlotPosition);
 
                     if (!GameInventoryObjectExtensions.IsHousingInventorySlot((eInventorySlot) newSlot) ||
@@ -349,7 +365,6 @@ namespace DOL.GS
                         return false;
                     }
 
-                    Start(EXPIRES_AFTER);
                     return true;
                 }
             }
@@ -358,7 +373,7 @@ namespace DOL.GS
             {
                 lock (_vault.Lock)
                 {
-                    ValidateCache(player);
+                    ValidateCacheInternal(player);
                     previousSlot = GetClientSlotPosition(previousSlot);
 
                     if (!GameInventoryObjectExtensions.IsHousingInventorySlot((eInventorySlot) previousSlot) ||
@@ -372,7 +387,6 @@ namespace DOL.GS
                         return false;
                     }
 
-                    Start(EXPIRES_AFTER);
                     return true;
                 }
             }
@@ -381,13 +395,10 @@ namespace DOL.GS
             {
                 lock (_vault.Lock)
                 {
-                    ValidateCache(player);
+                    ValidateCacheInternal(player);
 
                     if (previousFirstSlot == previousSecondSlot)
-                    {
-                        Start(EXPIRES_AFTER);
                         return true;
-                    }
 
                     DbInventoryItem existingFirstItem = null;
                     DbInventoryItem existingSecondItem = null;
@@ -425,8 +436,6 @@ namespace DOL.GS
                         _items.Remove(previousSecondSlot);
                         _items[previousFirstSlot] = secondItem;
                     }
-
-                    Start(EXPIRES_AFTER);
                 }
 
                 return true;
@@ -436,10 +445,15 @@ namespace DOL.GS
             {
                 lock (_vault.Lock)
                 {
-                    ValidateCache(player);
+                    ValidateCacheInternal(player);
                 }
 
                 return _items;
+            }
+
+            public void ForceValidateCache(GamePlayer player)
+            {
+                OnTick(this);
             }
 
             protected override int OnTick(ECSGameTimer timer)
@@ -453,24 +467,26 @@ namespace DOL.GS
                 return 0;
             }
 
-            private void ValidateCache(GamePlayer player)
+            private void ValidateCacheInternal(GamePlayer player)
             {
+                // Always refresh or start the timer.
+                Start(EXPIRES_AFTER);
+
                 if (_items != null)
                     return;
 
                 _items = new();
-                bool success = true;
 
                 foreach (DbInventoryItem item in _vault.GetDbItems(player))
                 {
                     int slotPosition = GetClientSlotPosition(item.SlotPosition);
 
                     if (!_items.TryAdd(slotPosition, item))
-                        success = false;
+                    {
+                        if (log.IsErrorEnabled)
+                            log.Error($"Error during cache validation. Slot already taken. (Added: {_items[slotPosition]}) (Rejected: {item}) (Player {player})");
+                    }
                 }
-
-                if (!success && log.IsErrorEnabled)
-                    log.Error($"Error during cache validation.");
             }
 
             private int GetClientSlotPosition(int slot)

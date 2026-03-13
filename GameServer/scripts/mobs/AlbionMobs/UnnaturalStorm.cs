@@ -121,12 +121,11 @@ namespace DOL.AI.Brain
 					spell.Name = "Storm Lightning";
 					spell.Range = 2500;
 					spell.SpellID = 11947;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_StormDD = new Spell(spell, 50);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_StormDD);
 				}
 				return m_StormDD;
 			}

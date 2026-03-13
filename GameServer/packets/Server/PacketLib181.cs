@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
@@ -45,12 +46,13 @@ namespace DOL.GS.PacketHandler
 			{
 				pak.WriteByte(0); // new in 1.75
 				pak.WriteByte(0); // new in 1.81
-				if (caption == null)
-					caption = string.Empty;
-				if (caption.Length > byte.MaxValue)
-					caption = caption.Substring(0, byte.MaxValue);
-				pak.WritePascalString(caption); //window caption
 
+				ReadOnlySpan<char> captionSpan = caption == null ? [] : caption;
+
+				if (captionSpan.Length > byte.MaxValue)
+					captionSpan = captionSpan[..byte.MaxValue];
+
+				pak.WritePascalString(captionSpan);
 				WriteCustomTextWindowData(pak, text);
 
 				//Trailing Zero!
@@ -149,24 +151,27 @@ namespace DOL.GS.PacketHandler
 
 				if (pet != null)
 				{
-					ArrayList icons = new ArrayList();
+					Span<ushort> buffer = stackalloc ushort[8];
+					int count = 0;
+
 					foreach (var effect in pet.effectListComponent.GetEffects())
 					{
-						if (icons.Count >= 8)
-							break;
-						if (effect.Icon == 0)
+						if (effect.Icon == 0 || effect.IsDisabled || effect is ECSImmunityEffect)
 							continue;
-						icons.Add(effect.Icon);
+
+						buffer[count++] = effect.Icon;
+
+						if (count >= 8)
+							break;
 					}
-					pak.WriteByte((byte)icons.Count); // effect count
-					// 0x08 - null terminated - (byte) list of shorts - spell icons on pet
-					foreach (ushort icon in icons)
-					{
-						pak.WriteShort(icon);
-					}
+
+					pak.WriteByte((byte) count);
+
+					for (int i = 0; i < count; i++)
+						pak.WriteShort(buffer[i]);
 				}
 				else
-					pak.WriteByte((byte)0); // effect count
+					pak.WriteByte(0);
 
 				SendTCP(pak);
 			}

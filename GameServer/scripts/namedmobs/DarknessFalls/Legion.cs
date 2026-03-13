@@ -561,7 +561,7 @@ namespace DOL.AI.Brain
 
                         if (effect != null)
                         {
-                            effect.Stop();//remove bladeturn effect here
+                            effect.End();//remove bladeturn effect here
                             bladeturnConsumed++;
 
                             if (target is GamePlayer player)
@@ -704,10 +704,9 @@ namespace DOL.AI.Brain
                     spell.Range = 0;
                     spell.Radius = 1000;
                     spell.SpellID = 12013;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = eSpellType.DirectDamageNoVariance.ToString();
                     m_LegionLifetapAoe = new Spell(spell, 60);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_LegionLifetapAoe);
                 }
                 return m_LegionLifetapAoe;
             }

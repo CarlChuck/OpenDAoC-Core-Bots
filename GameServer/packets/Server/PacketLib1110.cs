@@ -53,8 +53,6 @@ namespace DOL.GS.PacketHandler
 				return;
 			}
 
-			var tooltipSpellHandlers = new List<ISpellHandler>();
-
 			using (var pak = PooledObjectFactory.GetForTick<GSTCPPacketOut>().Init(GetPacketCode(eServerPackets.UpdateIcons)))
 			{
 				long initPos = pak.Position;
@@ -81,10 +79,12 @@ namespace DOL.GS.PacketHandler
 					// store tooltip update for gamespelleffect.
 					if (ForceTooltipUpdate && effect is ECSGameSpellEffect gameEffect)
 					{
-						tooltipSpellHandlers.Add(gameEffect.SpellHandler);
+						ISpellHandler spellHandler = gameEffect.SpellHandler;
+
+						if (spellHandler.Spell.IsDynamic || m_gameClient.CanSendTooltip(24, spellHandler.Spell.InternalID))
+							SendDelveInfo(DetailDisplayHandler.DelveSpell(spellHandler));
 					}
 
-					//						log.DebugFormat("adding [{0}] '{1}'", fxcount-1, effect.Name);
 					// icon index
 					pak.WriteByte((byte)(fxcount - 1));
 					// Determines where to grab the icon from. Spell-based effect icons use a different source than Ability-based icons.
@@ -145,13 +145,6 @@ namespace DOL.GS.PacketHandler
 				pak.Seek(0, SeekOrigin.End);
 
 				SendTCP(pak);
-			}
-
-			// force tooltips update
-			foreach (var spellHandler in tooltipSpellHandlers)
-			{
-				if (m_gameClient.CanSendTooltip(24, spellHandler.Spell.InternalID))
-					SendDelveInfo(DetailDisplayHandler.DelveSpell(spellHandler));
 			}
 		}
 
@@ -235,21 +228,23 @@ namespace DOL.GS.PacketHandler
                 return;
             using (var pak = PooledObjectFactory.GetForTick<GSTCPPacketOut>().Init(GetPacketCode(eServerPackets.SiegeWeaponAnimation)))
             {
-                pak.WriteInt((uint)siegeWeapon.ObjectID);
+                bool isGroundTargetValid = siegeWeapon.GroundTarget.IsValid;
+
+                pak.WriteInt(siegeWeapon.ObjectID);
                 pak.WriteInt(
                     (uint)
                     (siegeWeapon.TargetObject == null
-                     ? (siegeWeapon.GroundTarget == null ? 0 : siegeWeapon.GroundTarget.X)
+                     ? (!isGroundTargetValid ? 0 : siegeWeapon.GroundTarget.X)
                      : siegeWeapon.TargetObject.X));
                 pak.WriteInt(
                     (uint)
                     (siegeWeapon.TargetObject == null
-                     ? (siegeWeapon.GroundTarget == null ? 0 : siegeWeapon.GroundTarget.Y)
+                     ? (!isGroundTargetValid ? 0 : siegeWeapon.GroundTarget.Y)
                      : siegeWeapon.TargetObject.Y));
                 pak.WriteInt(
                     (uint)
                     (siegeWeapon.TargetObject == null
-                     ? (siegeWeapon.GroundTarget == null ? 0 : siegeWeapon.GroundTarget.Z)
+                     ? (!isGroundTargetValid ? 0 : siegeWeapon.GroundTarget.Z)
                      : siegeWeapon.TargetObject.Z));
                 pak.WriteInt((uint)(siegeWeapon.TargetObject == null ? 0 : siegeWeapon.TargetObject.ObjectID));
                 pak.WriteShort(siegeWeapon.Effect);

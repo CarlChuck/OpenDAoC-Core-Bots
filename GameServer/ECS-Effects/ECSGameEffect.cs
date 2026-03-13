@@ -12,6 +12,7 @@ namespace DOL.GS
     {
         private State _state;
         private TransitionalState _transitionalState;
+        private Lock _stateLock = new();
 
         public long ExpireTick;
         public long StartTick;
@@ -23,35 +24,35 @@ namespace DOL.GS
         public GameLiving Owner;
         public GamePlayer OwnerPlayer;
         public long NextTick;
-        public int PreviousPosition = -1;
-        public Lock StartStopLock { get; } = new();
+
         public ISpellHandler SpellHandler { get; protected set; }
         public virtual ushort Icon => 0;
         public virtual string Name => "Default Effect Name";
         public virtual string OwnerName => Owner != null ? Owner.Name : string.Empty;
         public virtual bool HasPositiveEffect => false;
-        public bool TriggersImmunity { get; set; } = false;
+        public ImmunityType AppliedImmunityType => !TriggersImmunity ? ImmunityType.None : (Owner is GamePlayer ? ImmunityType.Player : ImmunityType.Npc);
+        public bool TriggersImmunity { get; set; }
         public int ImmunityDuration { get; protected set; } = 60000;
         public bool IsBeingReplaced { get; set; } // Used externally to force an effect to be silent (no message, no immunity) when being refreshed.
-        public ServiceObjectId ServiceObjectId { get; set; } = new(ServiceObjectType.Effect);
+        public ServiceObjectId ServiceObjectId { get; } = new(ServiceObjectType.Effect);
 
         // State properties.
         public bool IsActive => _state is State.Active;
         public bool IsDisabled => _state is State.Disabled;
-        public bool IsStopped => _state is State.Stopped;
+        public bool IsEnded => _state is State.Ended;
 
         // Transitional state properties.
         public bool CanChangeState => _transitionalState is TransitionalState.None;
         public bool IsStarting => _transitionalState is TransitionalState.Starting;
         public bool IsEnabling => _transitionalState is TransitionalState.Enabling;
         public bool IsDisabling => _transitionalState is TransitionalState.Disabling;
-        public bool IsStopping => _transitionalState is TransitionalState.Stopping;
+        public bool IsEnding => _transitionalState is TransitionalState.Ending;
 
         // Actionability properties.
         public bool CanStart => _state is State.None && CanChangeState;
         public bool CanBeDisabled => IsActive && CanChangeState;
         public bool CanBeEnabled => IsDisabled && CanChangeState;
-        public bool CanBeStopped => (IsActive || IsDisabled) && CanChangeState;
+        public bool CanBeEnded => (IsActive || IsDisabled) && CanChangeState;
 
         public ECSGameEffect(in ECSGameEffectInitParams initParams)
         {
@@ -67,10 +68,10 @@ namespace DOL.GS
 
         public bool Start()
         {
-            if (!CanStart)
+            if (!CanStart || !Owner.IsAlive)
                 return false;
 
-            lock (StartStopLock)
+            lock (_stateLock)
             {
                 if (!CanStart)
                     return false;
@@ -86,7 +87,7 @@ namespace DOL.GS
             if (!CanBeEnabled)
                 return false;
 
-            lock (StartStopLock)
+            lock (_stateLock)
             {
                 if (!CanBeEnabled)
                     return false;
@@ -102,7 +103,7 @@ namespace DOL.GS
             if (!CanBeDisabled)
                 return false;
 
-            lock (StartStopLock)
+            lock (_stateLock)
             {
                 if (!CanBeDisabled)
                     return false;
@@ -113,14 +114,14 @@ namespace DOL.GS
             }
         }
 
-        public bool Stop(bool playerCanceled = false)
+        public bool End(bool playerCanceled = false)
         {
-            if (!CanBeStopped)
+            if (!CanBeEnded)
                 return false;
 
-            lock (StartStopLock)
+            lock (_stateLock)
             {
-                if (!CanBeStopped)
+                if (!CanBeEnded)
                     return false;
 
                 // Player can't remove negative or immunity effects.
@@ -132,7 +133,7 @@ namespace DOL.GS
                     return false;
                 }
 
-                _transitionalState = TransitionalState.Stopping;
+                _transitionalState = TransitionalState.Ending;
                 Owner.effectListComponent.ProcessEffect(this);
                 return true;
             }
@@ -169,8 +170,8 @@ namespace DOL.GS
 
         public virtual bool IsBetterThan(ECSGameEffect effect)
         {
-            return SpellHandler.Spell.Value * Effectiveness > effect.SpellHandler.Spell.Value * effect.Effectiveness ||
-                SpellHandler.Spell.Damage * Effectiveness > effect.SpellHandler.Spell.Damage * effect.Effectiveness;
+            return SpellHandler.Spell.Value * Effectiveness >= effect.SpellHandler.Spell.Value * effect.Effectiveness &&
+                SpellHandler.Spell.Damage * Effectiveness >= effect.SpellHandler.Spell.Damage * effect.Effectiveness;
         }
 
         public virtual bool IsConcentrationEffect() { return false; }
@@ -191,26 +192,21 @@ namespace DOL.GS
                 {
                     case EffectListComponent.AddEffectResult.Added:
                     {
-                        ServiceObjectStore.Add(this);
                         _state = State.Active;
                         return true;
                     }
                     case EffectListComponent.AddEffectResult.RenewedActive:
                     {
-                        ServiceObjectStore.Add(this);
                         _state = State.Active;
                         return false;
                     }
                     case EffectListComponent.AddEffectResult.Disabled:
                     {
-                        ServiceObjectStore.Add(this);
                         _state = State.Disabled;
                         return false;
                     }
                     case EffectListComponent.AddEffectResult.RenewedDisabled:
                     {
-                        ServiceObjectStore.Add(this);
-
                         if (IsDisabled)
                         {
                             _state = State.Active;
@@ -242,14 +238,12 @@ namespace DOL.GS
                 {
                     case EffectListComponent.RemoveEffectResult.Removed:
                     {
-                        ServiceObjectStore.Remove(this);
                         bool shouldBeStopped = IsActive;
-                        _state = State.Stopped;
+                        _state = State.Ended;
                         return shouldBeStopped;
                     }
                     case EffectListComponent.RemoveEffectResult.Disabled:
                     {
-                        ServiceObjectStore.Add(this);
                         bool shouldBeStopped = IsActive;
                         _state = State.Disabled;
                         return shouldBeStopped;
@@ -301,21 +295,28 @@ namespace DOL.GS
             }
         }
 
+        public enum ImmunityType
+        {
+            None,
+            Player,     // Player-style immunity. Effects triggering this immunity should not be allowed to be refreshed.
+            Npc         // NPC-style immunity, on which diminishing returns may apply.
+        }
+
         private enum State
         {
             None,
-            Active,
-            Disabled,
-            Stopped
+            Active,     // Effect is active and applying its benefits/penalties.
+            Disabled,   // Effect is temporarily disabled, not applying its benefits/penalties.
+            Ended       // Effect has ended and is to be removed.
         }
 
         private enum TransitionalState
         {
             None,
-            Starting,
-            Enabling,
-            Disabling,
-            Stopping
+            Starting,   // Effect is being started.
+            Enabling,   // Effect is being enabled, resuming its benefits/penalties and transitioning from disabled to active.
+            Disabling,  // Effect is being disabled, pausing its benefits/penalties.
+            Ending      // Effect is being ended.
         }
     }
 }

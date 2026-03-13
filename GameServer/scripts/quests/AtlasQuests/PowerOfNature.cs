@@ -583,14 +583,13 @@ namespace DOL.GS.Quests.Hibernia
                     spell.Range = 0;
                     spell.Radius = 0;
                     spell.SpellID = 5005;
-                    spell.Target = "Self";
+                    spell.Target = eSpellTarget.SELF.ToString();
                     spell.Type = "StrengthBuff";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = 0;
                     spell.Message1 = "The power of nature surrounds you.";
                     m_effect = new Spell(spell, 1);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_effect);
                 }
                 return m_effect;
             }

@@ -111,13 +111,12 @@ namespace DOL.GS
                     spell.Range = 1500;
                     spell.Radius = 350;
                     spell.SpellID = 99998;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "ArmorAbsorptionDebuff";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int) eDamageType.Spirit;
                     m_absDebuffSpell = new Spell(spell, 50);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_absDebuffSpell);
                 }
 
                 return m_absDebuffSpell;

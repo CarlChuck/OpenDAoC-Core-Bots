@@ -450,13 +450,12 @@ namespace DOL.AI.Brain
                     spell.Range = 3000;
                     spell.Radius = 450;
                     spell.SpellID = 11707;
-                    spell.Target = "Area";
+                    spell.Target = eSpellTarget.AREA.ToString();
                     spell.Type = eSpellType.DirectDamageNoVariance.ToString();
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int) eDamageType.Cold;
                     m_BeathaAoe = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_BeathaAoe);
                 }
                 return m_BeathaAoe;
             }
@@ -652,13 +651,12 @@ namespace DOL.AI.Brain
                     spell.Range = 3000;
                     spell.Radius = 450;
                     spell.SpellID = 11708;
-                    spell.Target = "Area";
+                    spell.Target = eSpellTarget.AREA.ToString();
                     spell.Type = eSpellType.DirectDamageNoVariance.ToString();
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int) eDamageType.Heat;
                     m_TineAoe = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_TineAoe);
                 }
                 return m_TineAoe;
             }

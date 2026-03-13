@@ -11,7 +11,6 @@ using DOL.GS.PacketHandler;
 using DOL.GS.RealmAbilities;
 using DOL.GS.ServerProperties;
 using DOL.GS.SkillHandler;
-using DOL.GS.Spells;
 using DOL.GS.Styles;
 using DOL.Language;
 using static DOL.GS.GameObject;
@@ -20,25 +19,16 @@ namespace DOL.GS
 {
     public class AttackComponent : IServiceObject
     {
-        public const double INHERENT_WEAPON_SKILL = 15.0;
-        public const double INHERENT_ARMOR_FACTOR = 12.5;
-
         public GameLiving owner;
         public WeaponAction weaponAction; // This represents the current weapon action, which may become outdated when resolving ranged attacks.
         public AttackAction attackAction;
-        public ServiceObjectId ServiceObjectId { get; set; } = new(ServiceObjectType.AttackComponent);
+        public ServiceObjectId ServiceObjectId { get; } = new(ServiceObjectType.AttackComponent);
         public AttackerTracker AttackerTracker { get; private set; }
 
         private BlockRoundHandler _blockRoundHandler;
         private GameObject _startAttackTarget;
-        private int _startAttackRequested;
+        private bool _startAttackRequested;
         private GameLiving[] _broadcastExcludes = new GameLiving[3];
-
-        public bool StartAttackRequested
-        {
-            get => Interlocked.CompareExchange(ref _startAttackRequested, 0, 0) == 1;
-            set => Interlocked.Exchange(ref _startAttackRequested, Convert.ToInt32(value));
-        }
 
         public AttackComponent(GameLiving owner)
         {
@@ -57,9 +47,9 @@ namespace DOL.GS
                 return;
             }
 
-            if (StartAttackRequested)
+            if (_startAttackRequested)
             {
-                StartAttackRequested = false;
+                _startAttackRequested = false;
                 StartAttack();
             }
 
@@ -138,7 +128,7 @@ namespace DOL.GS
 
         public virtual bool AttackState
         {
-            get => _attackState || StartAttackRequested;
+            get => _attackState || _startAttackRequested;
             set => _attackState = value;
         }
 
@@ -253,7 +243,6 @@ namespace DOL.GS
 
                 minimum = 1500;
                 double speed = 0;
-                bool bowWeapon = false;
 
                 // If leftWeapon is null even on a dual wield attack, use the mainWeapon instead.
                 switch (UsedHandOnLastDualWieldAttack)
@@ -285,7 +274,7 @@ namespace DOL.GS
                 if (speed == 0)
                     return 0;
 
-                bowWeapon = (eObjectType) mainWeapon.Object_Type is
+                bool bowWeapon = (eObjectType) mainWeapon.Object_Type is
                     eObjectType.Fired or
                     eObjectType.Longbow or
                     eObjectType.Crossbow or
@@ -392,75 +381,91 @@ namespace DOL.GS
             };
         }
 
-        public double AttackDamage(DbInventoryItem weapon, WeaponAction action, out double damageCap)
+        public double WeaponDamage(DbInventoryItem weapon, WeaponAction action, double effectiveness, out double damageCap)
         {
-            damageCap = 0;
+            double damage = owner is GamePlayer player ? CalculatePlayerDamage(player, weapon, action) : CalculateNpcDamage(weapon);
+            damage *= effectiveness;
+            damageCap = CalculateDamageCap(damage);
+            damage *= GetWeaponQualityConditionModifier(weapon); // Quality and condition don't affect damage cap.
+            return damage;
+        }
 
-            if (owner is GamePlayer player)
+        private double CalculatePlayerDamage(GamePlayer player, DbInventoryItem weapon, WeaponAction action)
+        {
+            if (weapon == null)
+                return 0;
+
+            double damage = player.WeaponDamageWithoutQualityAndCondition(weapon) * weapon.SPD_ABS * 0.1 * CalculateSlowWeaponDamageModifier(weapon);
+
+            if (weapon.Item_Type is Slot.RIGHTHAND or Slot.LEFTHAND or Slot.TWOHAND)
             {
-                if (weapon == null)
-                    return 0;
-
-                damageCap = player.WeaponDamageWithoutQualityAndCondition(weapon) * weapon.SPD_ABS * 0.1 * CalculateSlowWeaponDamageModifier(weapon);
-
                 if (player.ActiveLeftWeapon != null)
-                {
-                    if (weapon.Item_Type is Slot.RIGHTHAND or Slot.LEFTHAND or Slot.TWOHAND)
-                        damageCap *= CalculateLeftAxeModifier();
-                }
-                else if (weapon.Item_Type is Slot.RANGED)
-                {
-                    damageCap *= CalculateTwoHandedDamageModifier(weapon);
-                    DbInventoryItem ammo = GetAttackAmmo(action);
+                    damage *= CalculateLeftAxeModifier();
 
-                    if (ammo != null)
-                    {
-                        switch ((ammo.SPD_ABS) & 0x3)
-                        {
-                            case 0:
-                                damageCap *= 0.85;
-                                break; // Blunt (light) -15%.
-                            case 1:
-                                break; // Bodkin (medium) 0%.
-                            case 2:
-                                damageCap *= 1.15;
-                                break; // Doesn't exist on live.
-                            case 3:
-                                damageCap *= 1.25;
-                                break; // Broadhead (X-heavy) +25%.
-                        }
-                    }
-                }
-                else if (weapon.Item_Type is Slot.TWOHAND)
-                    damageCap *= CalculateTwoHandedDamageModifier(weapon);
-
-                double damage = GamePlayer.ApplyWeaponQualityAndConditionToDamage(weapon, damageCap);
-                damageCap *= 3;
-                return damage;
-            }
-            else
-            {
-                double damage = (1.0 + owner.Level / Properties.PVE_MOB_DAMAGE_F1 + owner.Level * owner.Level / Properties.PVE_MOB_DAMAGE_F2) * NpcWeaponSpeed(weapon) * 0.1;
-
-                if (owner is GameNPC npc)
-                    damage *= npc.DamageFactor;
-
-                if (weapon?.SlotPosition is Slot.TWOHAND or Slot.RANGED)
+                if (weapon.Item_Type is Slot.TWOHAND)
                     damage *= CalculateTwoHandedDamageModifier(weapon);
-
-                damageCap = damage * 3;
-
-                if (owner is GameEpicBoss)
-                    damageCap *= Properties.SET_EPIC_ENCOUNTER_WEAPON_DAMAGE_CAP;
-
-                return damage;
             }
+            else if (weapon.Item_Type is Slot.RANGED)
+            {
+                damage *= CalculateTwoHandedDamageModifier(weapon);
+                damage *= GetAmmoModifier(action);
+            }
+
+            return damage;
+        }
+
+        private double GetAmmoModifier(WeaponAction action)
+        {
+            DbInventoryItem ammo = GetAttackAmmo(action);
+
+            if (ammo == null)
+                return 1.0;
+
+            return (ammo.SPD_ABS & 0x3) switch
+            {
+                0 => 0.85,  // Blunt (light) -15%
+                1 => 1.0,   // Bodkin (medium) 0%
+                2 => 1.15,  // Doesn't exist on live
+                3 => 1.25,  // Broadhead (X-heavy) +25%
+                _ => 1.0
+            };
+        }
+
+        private double CalculateNpcDamage(DbInventoryItem weapon)
+        {
+            double damage = (1.0 + owner.Level / Properties.PVE_MOB_DAMAGE_F1 + owner.Level * owner.Level / Properties.PVE_MOB_DAMAGE_F2) * NpcWeaponSpeed(weapon) * 0.1;
+
+            if (owner is GameNPC npc)
+                damage *= npc.DamageFactor;
+
+            if (weapon?.SlotPosition is Slot.TWOHAND or Slot.RANGED)
+                damage *= CalculateTwoHandedDamageModifier(weapon);
+
+            return damage;
+        }
+
+        private double CalculateDamageCap(double damage)
+        {
+            double damageCap = damage * 3.0;
+
+            if (owner is GameEpicBoss)
+                damageCap *= Properties.SET_EPIC_ENCOUNTER_WEAPON_DAMAGE_CAP;
+
+            return damageCap;
+        }
+
+        public double GetWeaponQualityConditionModifier(DbInventoryItem weapon)
+        {
+            if (owner is not GamePlayer || weapon == null)
+                return 1.0;
+
+            return weapon.Quality * weapon.ConditionPercent * 0.0001;
         }
 
         public void RequestStartAttack(GameObject attackTarget = null)
         {
             _startAttackTarget = attackTarget ?? owner.TargetObject;
-            StartAttackRequested = true;
+            _startAttackRequested = true;
             ServiceObjectStore.Add(this);
         }
 
@@ -713,12 +718,6 @@ namespace DOL.GS
             GameNPC npc = owner as GameNPC;
             npc.FireAmbientSentence(GameNPC.eAmbientTrigger.fighting, _startAttackTarget);
 
-            if (npc.Brain is IControlledBrain brain)
-            {
-                if (brain.AggressionState is eAggressionState.Passive)
-                    return;
-            }
-
             // NPCs aren't allowed to prepare their ranged attack while moving or out of range.
             // If we have a running `AttackAction`, let it decide what to do. Not every NPC should start following their target and this allows us to react faster.
             if (npc.ActiveWeaponSlot is eActiveWeaponSlot.Distance)
@@ -748,9 +747,7 @@ namespace DOL.GS
                     if (npc.IsMoving)
                         npc.StopMoving();
 
-                    if (npc.ActiveWeaponSlot is eActiveWeaponSlot.Distance)
-                        npc.TurnTo(_startAttackTarget);
-
+                    npc.TurnTo(_startAttackTarget);
                     npc.Follow(_startAttackTarget, npc.StickMinimumRange, npc.StickMaximumRange);
                 }
             }
@@ -760,7 +757,7 @@ namespace DOL.GS
 
         public void StopAttack()
         {
-            StartAttackRequested = false;
+            _startAttackRequested = false;
 
             if (owner.ActiveWeaponSlot is eActiveWeaponSlot.Distance)
             {
@@ -777,7 +774,7 @@ namespace DOL.GS
                 }
 
                 if (owner.effectListComponent.ContainsEffectForEffectType(eEffect.TrueShot))
-                    EffectListService.GetEffectOnTarget(owner, eEffect.TrueShot).Stop();
+                    EffectListService.GetEffectOnTarget(owner, eEffect.TrueShot).End();
             }
 
             attackAction.OnStopAttack();
@@ -828,7 +825,7 @@ namespace DOL.GS
                     playerOwner.Out.SendCloseTimerWindow();
                 }
 
-                AttackData ad = LivingMakeAttack(action, target, weapon, style, effectiveness * playerOwner.Effectiveness, interval, dualWield);
+                AttackData ad = LivingMakeAttack(action, target, weapon, style, effectiveness, interval, dualWield);
 
                 switch (ad.AttackResult)
                 {
@@ -945,10 +942,6 @@ namespace DOL.GS
 
                             foreach (GameObject extraTarget in extraTargets)
                             {
-                                // Damage bonus against sitting targets is normally set by `AttackAction`.
-                                if (extraTarget is GamePlayer player && player.IsSitting)
-                                    effectiveness *= 2;
-
                                 weaponAction = new WeaponAction(playerOwner, extraTarget, attackWeapon, leftWeapon, effectiveness, AttackSpeed(attackWeapon), null);
                                 weaponAction.Execute();
                             }
@@ -1053,9 +1046,6 @@ namespace DOL.GS
                 return ad;
             }
 
-            if (ad.Target.IsSitting)
-                effectiveness *= 2;
-
             // Apply Mentalist RA5L.
             SelectiveBlindnessEffect SelectiveBlindness = owner.EffectList.GetOfType<SelectiveBlindnessEffect>();
             if (SelectiveBlindness != null)
@@ -1107,7 +1097,7 @@ namespace DOL.GS
                 case eAttackResult.HitUnstyled:
                 case eAttackResult.HitStyle:
                 {
-                    double damage = AttackDamage(weapon, action, out double baseDamageCap);
+                    double damage = WeaponDamage(weapon, action, effectiveness, out double baseDamageCap);
                     DbInventoryItem armor = null;
 
                     if (ad.Target.Inventory != null)
@@ -1115,27 +1105,24 @@ namespace DOL.GS
 
                     double weaponSkill = CalculateWeaponSkill(weapon, ad.Target, out int spec, out (double, double) varianceRange, out double specModifier, out double baseWeaponSkill);
                     double armorMod = CalculateTargetArmor(ad.Target, ad.ArmorHitLocation, out double armorFactor, out double absorb);
+
                     double damageMod = weaponSkill / armorMod;
-
-                    // Badge Of Valor Calculation 1+ absorb or 1- absorb
-                    // if (ad.Attacker.EffectList.GetOfType<BadgeOfValorEffect>() != null)
-                    //     damage *= 1.0 + Math.Min(0.85, ad.Target.GetArmorAbsorb(ad.ArmorHitLocation));
-                    // else
-                    //     damage *= 1.0 - Math.Min(0.85, ad.Target.GetArmorAbsorb(ad.ArmorHitLocation));
-
-                    if (ad.IsOffHand)
-                        damage *= 1 + owner.GetModified(eProperty.OffhandDamage) * 0.01;
+                    damageMod *= RelicMgr.GetRelicBonusModifier(owner, eRelicType.Strength);
 
                     // If the target is another player's pet, shouldn't 'PVP_MELEE_DAMAGE' be used?
                     if (owner is GamePlayer || (owner is GameNPC npcOwner && npcOwner.Brain is IControlledBrain && owner.Realm != 0))
                     {
                         if (target is GamePlayer)
-                            damage *= Properties.PVP_MELEE_DAMAGE;
+                            damageMod *= Properties.PVP_MELEE_DAMAGE;
                         else if (target is GameNPC)
-                            damage *= Properties.PVE_MELEE_DAMAGE;
+                            damageMod *= Properties.PVE_MELEE_DAMAGE;
                     }
 
                     damage *= damageMod;
+
+                    // The wiki applies resistance on the damage mod then eventually caps it at 3.
+                    // We apply the resistances later, and calculate the cap differently. But it should be mathematically equivalent.
+                    double resistMod = CalculateTargetResistanceFactor(ad.Target, ad.DamageType, armor);
 
                     // Melee damage and style damage ToA bonuses are pretty weird.
                     // * They're both calculated from base damage.
@@ -1144,61 +1131,78 @@ namespace DOL.GS
                     // * However, the first one will be added to base damage, and the second one to style damage. This is really just for display purposes.
                     // * They stack multiplicatively. Assuming a GR of 0, two 10% bonuses result in the attack doing 21% more damage.
                     // * The higher the GR, the lower their contribution to total damage is (since GR is actually ignored).
+                    double baseDamageSnapshot = damage;
 
-                    effectiveness *= CalculateEffectiveness(weapon); // Augment the passed effectiveness with the weapon's effectiveness (ToA bonuses, etc.).
-                    double preEffectivenessDamage = damage; // Damage snapshot before applying effectiveness, to be used to calculate style damage.
-                    double preEffectivenessBaseDamageCap = baseDamageCap; // Damage cap snapshot before applying effectiveness, to be used to calculate style damage.
-                    damage *= effectiveness;
-                    baseDamageCap *= effectiveness;
+                    // These bonuses don't increase the cap. This is correct for ToA melee bonus, but unknown for Savage/Cleric self-buff (they currently are of the same type).
+                    damage *= CalculateDamageTypeModifier(weapon);
 
-                    double conversionMod = CalculateTargetConversion(ad.Target);
-                    double primarySecondaryResistMod = CalculateTargetResistance(ad.Target, ad.DamageType, armor);
-                    double primarySecondaryResistConversionMod = primarySecondaryResistMod * conversionMod;
-
-                    // This makes capped unstyled hits have weird modifiers, and no longer match the actual damage reduction from resistances; for example 150 (-1432) against a naked target.
-                    // But inaccurate modifiers when the cap is hit appears to be live like.
-                    double preResistDamage = damage; // Pre resist damage snapshot in case we need to add style damage bonus.
-                    double modifier = Math.Min(baseDamageCap, preResistDamage * primarySecondaryResistConversionMod) - damage;
-                    damage += modifier;
-
-                    // Outside the style execution block because we need it for the detailed combat log.
-                    double styleDamageCap = 0;
+                    double styleDamage = 0.0;
+                    double styleDamageCap = 0.0;
+                    double resistModifier = 0.0;
 
                     if (style != null)
                     {
-                        if (StyleProcessor.ExecuteStyle(ad, preEffectivenessDamage, preEffectivenessBaseDamageCap, out double styleDamage, out styleDamageCap, out int animationId))
+                        if (StyleProcessor.ExecuteStyle(ad, baseDamageSnapshot, baseDamageCap, out styleDamage, out styleDamageCap, out int animationId))
                         {
-                            double styleDamageBonus = preResistDamage * owner.GetModified(eProperty.StyleDamage) * 0.01;
-                            styleDamage += styleDamageBonus;
-                            styleDamageCap += styleDamageBonus;
+                            // Apply style bonus, calculated on base damage.
+                            styleDamage += damage * owner.GetModified(eProperty.StyleDamage) * 0.01;
 
-                            double preResistStyleDamage = styleDamage;
-                            ad.StyleDamage = (int) preResistStyleDamage; // We show uncapped and unmodified by resistances style damage. This should only be used by the combat log.
-                            // We have to calculate damage reduction again because `ExecuteStyle` works with pre resist base damage. Static growth styles also don't use it.
-                            styleDamage = preResistStyleDamage * primarySecondaryResistConversionMod;
+                            // Save the raw unresisted style damage for the AttackData. To be used by the combat log only.
+                            ad.StyleDamage = (int) styleDamage;
 
-                            if (styleDamageCap > 0)
-                                styleDamage = Math.Min(styleDamageCap, styleDamage);
+                            // Apply resistances to style damage and update resist modifier.
+                            double postResistStyle = styleDamage * resistMod;
+                            resistModifier += postResistStyle - styleDamage;
 
-                            damage += styleDamage;
-                            modifier += styleDamage - preResistStyleDamage;
+                            // Update style damage tracking
+                            styleDamage = postResistStyle;
                             ad.AttackResult = eAttackResult.HitStyle;
                         }
 
-                        // Play the style animation even on imperfect execution.
                         ad.AnimationId = animationId;
                     }
 
-                    ad.Damage = (int) damage;
-                    ad.Modifier = (int) Math.Floor(modifier);
-                    ad.CriticalChance = CalculateCriticalChance(action);
-                    ad.CriticalDamage = CalculateCriticalDamage(ad);
+                    // Apply resistances to base damage and update resist modifier.
+                    double postResistDamage = damage * resistMod;
+                    resistModifier += postResistDamage - damage;
+                    damage = postResistDamage;
 
+                    // Apply conversion.
+                    double conversionMod = CalculateTargetConversionFactor(ad.Target);
+                    damage *= conversionMod;
+                    styleDamage *= conversionMod;
+
+                    // Apply base damage cap.
+                    damage = Math.Min(damage, baseDamageCap);
+
+                    // Snapshot base damage and base damage cap.
+                    // Currently used by damage adds and shields.
+                    ad.BaseDamage = damage;
+                    ad.BaseDamageCap = baseDamageCap;
+
+                    // Apply style damage.
+                    if (style != null && styleDamage > 0)
+                    {
+                        if (styleDamageCap > -1)
+                            styleDamage = Math.Min(styleDamage, styleDamageCap);
+
+                        damage += styleDamage;
+                    }
+
+                    // Apply conversion regen. Unsure how this should interact with the damage cap.
                     if (conversionMod < 1)
                     {
                         double conversionAmount = conversionMod > 0 ? damage / conversionMod - damage : damage;
                         ApplyTargetConversionRegen(ad.Target, (int) conversionAmount);
                     }
+
+                    if (damage < 0)
+                        damage = 0;
+
+                    ad.Damage = (int) damage;
+                    ad.Modifier = (int) Math.Floor(resistModifier);
+                    ad.CriticalChance = CalculateCriticalChance(action);
+                    ad.CriticalDamage = CalculateCriticalDamage(ad);
 
                     if (playerOwner != null && playerOwner.UseDetailedCombatLog)
                         PrintDetailedCombatLog(playerOwner, armorFactor, absorb, armorMod, baseWeaponSkill, varianceRange, specModifier, weaponSkill, damageMod, baseDamageCap, styleDamageCap);
@@ -1213,9 +1217,9 @@ namespace DOL.GS
                 case eAttackResult.Parried:
                 case eAttackResult.Missed:
                 {
-                    // Reduce endurance by half the style's cost if we missed.
+                    // Reduce endurance by half the style's cost if we missed or got evaded, parried, blocked.
                     if (ad.Style != null && playerOwner != null && weapon != null)
-                        playerOwner.Endurance -= StyleProcessor.CalculateEnduranceCost(playerOwner, ad.Style, weapon.SPD_ABS) / 2;
+                        StyleProcessor.ApplyEnduranceCost(playerOwner, weapon, ad.Style, true);
 
                     break;
                 }
@@ -1241,38 +1245,6 @@ namespace DOL.GS
             SendDefendingCombatMessages(ad);
             BroadcastObserverMessage(ad);
 
-            #region Prevent Flight
-
-            if (ad.Attacker is GamePlayer)
-            {
-                GamePlayer attacker = ad.Attacker as GamePlayer;
-                if (attacker.HasAbilityType(typeof(AtlasOF_PreventFlight)) && Util.Chance(35))
-                {
-                    if (owner.IsObjectInFront(ad.Target, 120) && ad.Target.IsMoving)
-                    {
-                        bool preCheck = false;
-                        float angle = ad.Target.GetAngle(ad.Attacker);
-                        if (angle >= 150 && angle < 210) preCheck = true;
-
-                        if (preCheck)
-                        {
-                            Spell spell = SkillBase.GetSpellByID(7083);
-                            if (spell != null)
-                            {
-                                ISpellHandler spellHandler = ScriptMgr.CreateSpellHandler(owner, spell,
-                                    SkillBase.GetSpellLine(GlobalSpellsLines.Reserved_Spells));
-                                if (spellHandler != null)
-                                {
-                                    spellHandler.StartSpell(ad.Target);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            #endregion
-
             // Interrupt the target of the attack.
             ad.Target.StartInterruptTimer(interval, ad.AttackType, ad.Attacker);
 
@@ -1285,24 +1257,15 @@ namespace DOL.GS
             return ad;
         }
 
-        public double CalculateEffectiveness(DbInventoryItem weapon)
+        public double CalculateDamageTypeModifier(DbInventoryItem weapon)
         {
-            double effectiveness = 100;
-
             if (weapon == null || weapon.Item_Type is Slot.RIGHTHAND or Slot.LEFTHAND or Slot.TWOHAND)
-                effectiveness += owner.GetModified(eProperty.MeleeDamage);
-            else if (weapon.Item_Type is Slot.RANGED)
-            {
-                effectiveness += owner.GetModified(eProperty.RangedDamage);
+                return 1 + owner.GetModified(eProperty.MeleeDamage) * 0.01;
 
-                if ((eObjectType) weapon.Object_Type is eObjectType.Longbow or eObjectType.RecurvedBow or eObjectType.CompositeBow)
-                {
-                    if (!Properties.ALLOW_OLD_ARCHERY)
-                        effectiveness += owner.GetModified(eProperty.SpellDamage);
-                }
-            }
+            if (weapon.Item_Type is Slot.RANGED && (eObjectType) weapon.Object_Type is eObjectType.Longbow or eObjectType.RecurvedBow or eObjectType.CompositeBow)
+                return 1 + owner.GetModified(eProperty.RangedDamage) * 0.01;
 
-            return effectiveness * 0.01;
+            return 1.0;
         }
 
         public double CalculateWeaponSkill(DbInventoryItem weapon, GameLiving target, out int spec, out (double, double) varianceRange, out double specModifier, out double baseWeaponSkill)
@@ -1314,13 +1277,8 @@ namespace DOL.GS
 
         public double CalculateWeaponSkill(DbInventoryItem weapon, double specModifier, out double baseWeaponSkill)
         {
-            baseWeaponSkill = owner.GetWeaponSkill(weapon) + INHERENT_WEAPON_SKILL;
-            double relicBonus = 1.0;
-
-            if (owner is GamePlayer)
-                relicBonus += RelicMgr.GetRelicBonusModifier(owner.Realm, eRelicType.Strength);
-
-            return baseWeaponSkill * relicBonus * specModifier;
+            baseWeaponSkill = owner.GetWeaponSkill(weapon);
+            return baseWeaponSkill * specModifier;
         }
 
         public double CalculateDefensePenetration(DbInventoryItem weapon, int targetLevel)
@@ -1363,19 +1321,9 @@ namespace DOL.GS
                 if (playerOwner.SpecLock > 0)
                     return (playerOwner.SpecLock, playerOwner.SpecLock);
 
-                // Characters below level 5 get a bonus to their spec to help with the very wide variance at this level range.
-                // Target level, lower bound at 2, lower bound at 1:
-                // 0 | 1      | 0.25
-                // 1 | 0.625  | 0.25
-                // 2 | 0.5    | 0.25
-                // 3 | 0.4375 | 0.25
-                // 4 | 0.4    | 0.25
-                // 5 | 0.375  | 0.25
-                // Absolute minimum spec is set to 1 to prevent an issue where the lower bound (with staffs for example) would slightly rise with the target's level.
-                // Also prevents negative values.
-                spec = Math.Max(owner.Level < 5 ? 2 : 1, spec);
-                double specVsTargetLevelMod = (spec - 1) / ((double) target.Level + 1);
-                varianceRange = (Math.Min(0.75 * specVsTargetLevelMod + 0.25, 1.0), Math.Min(Math.Max(1.25 + (3.0 * specVsTargetLevelMod - 2) * 0.25, 1.25), 1.5));
+                double specRatio = Math.Min((spec - 1) / ((double) target.Level + 1), 1.0);
+                double minVariance = 0.75 + 0.5 * specRatio;
+                varianceRange = (minVariance, minVariance + 0.5);
             }
             else
                 varianceRange = (0.9, 1.1);
@@ -1387,34 +1335,50 @@ namespace DOL.GS
         {
             varianceRange = CalculateVarianceRange(target, spec);
             double difference = varianceRange.upperLimit - varianceRange.lowerLimit;
-            return varianceRange.lowerLimit + Util.RandomDoubleIncl() * difference;
+            return varianceRange.lowerLimit + owner.GetPseudoDoubleIncl(RandomDeckEvent.DamageVariance) * difference;
         }
 
         public static double CalculateTargetArmor(GameLiving target, eArmorSlot armorSlot, out double armorFactor, out double absorb)
         {
-            armorFactor = target.GetArmorAF(armorSlot) + INHERENT_ARMOR_FACTOR;
+            // Give an extra 0.4–20 armor factor to players.
+            // This matches the formula on https://camelotherald.fandom.com/wiki/Melee_Damage.
+            // The formula seems to work when compared against a couple of old combat logs,
+            // but not on Live servers, hinting that it was either increased at some point,
+            // or that the variance min and max modifiers were lowered (while preserving the spread, since it still matches).
+            // On Phoenix, it was increased to 45 at level 50 (0.9 per level), which is still lower than what Live appears to be using (Jan 2026).
+            const double PLAYER_EXTRA_AF_PER_LEVEL = 0.4;
 
-            // Gives an extra 0.4~20 bonus AF to players. Ideally this should be done in `ArmorFactorCalculator`.
+            armorFactor = target.GetArmorAF(armorSlot);
+
             if (target is GamePlayer or GameTrainingDummy)
-                armorFactor += target.Level * 20 / 50.0;
+                armorFactor += target.Level * PLAYER_EXTRA_AF_PER_LEVEL;
 
-            absorb = target.GetArmorAbsorb(armorSlot);
-            return absorb >= 1 ? double.MaxValue : armorFactor / (1 - absorb);
+            double absorbFactor = CalculateTargetAbsorbFactor(target, armorSlot);
+            absorb = 1 - absorbFactor;
+            return absorb >= 1 ? double.MaxValue : Math.Max(1, armorFactor / absorbFactor);
         }
 
-        public static double CalculateTargetResistance(GameLiving target, eDamageType damageType, DbInventoryItem armor)
+        public static double CalculateTargetAbsorbFactor(GameLiving target, eArmorSlot armorSlot)
         {
-            double damageModifier = 1.0;
-            damageModifier *= 1.0 - (target.GetResist(damageType) + SkillBase.GetArmorResist(armor, damageType)) * 0.01;
-            return damageModifier;
+            double armorAbsorb = target.GetArmorAbsorb(armorSlot);
+            // Badge of Valor check should go here.
+            double physicalAbsorb = target.GetModified(eProperty.PhysicalAbsorption) * 0.01;
+            return (1 - armorAbsorb) * (1 - physicalAbsorb);
         }
 
-        public static double CalculateTargetConversion(GameLiving target)
+        public static double CalculateTargetResistanceFactor(GameLiving target, eDamageType damageType, DbInventoryItem armor)
+        {
+            int targetResist = target.GetResist(damageType);
+            int armorResist = SkillBase.GetArmorResist(armor, damageType);
+            return 1 - (targetResist + armorResist) * 0.01;
+        }
+
+        public static double CalculateTargetConversionFactor(GameLiving target)
         {
             if (target is not GamePlayer)
                 return 1.0;
 
-            double conversionMod = 1 - target.GetModified(eProperty.Conversion) / 100.0;
+            double conversionMod = 1 - target.GetModified(eProperty.Conversion) * 0.01;
             return Math.Min(1.0, conversionMod);
         }
 
@@ -1446,15 +1410,10 @@ namespace DOL.GS
         {
             double blockChance = owner.TryBlock(ad, out int shieldSize);
             ad.BlockChance = blockChance * 100;
-            double blockRoll;
 
             if (blockChance > 0)
             {
-                if (!Properties.OVERRIDE_DECK_RNG && owner is GamePlayer player)
-                    blockRoll = player.RandomDeck.GetPseudoDouble();
-                else
-                    blockRoll = Util.RandomDouble();
-
+                double blockRoll = owner.GetPseudoDouble(RandomDeckEvent.Block);
                 bool blockSucceeded = blockChance > blockRoll;
                 string message = $"block%: {blockChance * 100:0.##} rand: {blockRoll * 100:0.##}";
 
@@ -1532,39 +1491,23 @@ namespace DOL.GS
                 if (source is GameNPC)
                     guardChance = source.GetModified(eProperty.BlockChance);
                 else
-                    guardChance = source.GetModified(eProperty.BlockChance) * (leftHand.Quality * 0.01) * (leftHand.Condition / (double) leftHand.MaxCondition);
+                    guardChance = source.GetModified(eProperty.BlockChance) * (leftHand.Quality * 0.01) * (leftHand.ConditionPercent * 0.01);
 
                 guardChance *= 0.001;
                 guardChance += source.GetAbilityLevel(Abilities.Guard) * 0.05; // 5% additional chance to guard with each Guard level.
                 guardChance *= 1 - ad.DefensePenetration;
 
-                if (guardChance > Properties.BLOCK_CAP && ad.Attacker is GamePlayer && ad.Target is GamePlayer)
-                    guardChance = Properties.BLOCK_CAP;
-
-                int shieldSize = 1; // Guard isn't affected by shield size or attacker count.
-
-                if (leftHand != null)
-                    shieldSize = Math.Max(leftHand.Type_Damage, 1);
-
-                // Possibly intended to be applied in RvR only.
-                if (shieldSize == 1 && guardChance > 0.8)
-                    guardChance = 0.8;
-                else if (shieldSize == 2 && guardChance > 0.9)
-                    guardChance = 0.9;
-                else if (shieldSize == 3 && guardChance > 0.99)
-                    guardChance = 0.99;
+                // Guard isn't affected by shield size or attacker count.
 
                 if (ad.AttackType is AttackData.eAttackType.MeleeDualWield)
                     guardChance *= ad.Attacker.DualWieldDefensePenetrationFactor;
 
+                if (guardChance > Properties.BLOCK_CAP && ad.Attacker is GamePlayer && ad.Target is GamePlayer)
+                    guardChance = Properties.BLOCK_CAP;
+
                 if (guardChance > 0)
                 {
-                    double guardRoll;
-
-                    if (!Properties.OVERRIDE_DECK_RNG && owner is GamePlayer player)
-                        guardRoll = player.RandomDeck.GetPseudoDouble();
-                    else
-                        guardRoll = Util.RandomDouble();
+                    double guardRoll = owner.GetPseudoDouble(RandomDeckEvent.Block);
 
                     if (source is GamePlayer blockAttk && blockAttk.UseDetailedCombatLog)
                         blockAttk.Out.SendMessage($"chance to guard: {guardChance * 100:0.##} rand: {guardRoll * 100:0.##}", eChatType.CT_DamageAdd, eChatLoc.CL_SystemWindow);
@@ -1622,18 +1565,12 @@ namespace DOL.GS
             if (EffectListService.GetAbilityEffectOnTarget(owner, eEffect.Berserk) != null)
                 defenseDisabled = true;
 
-            // We check if interceptor can intercept.
+            // Intercept.
             foreach (InterceptECSGameEffect inter in owner.effectListComponent.GetAbilityEffects(eEffect.Intercept))
             {
                 if (inter.Target == owner && !inter.Source.IsIncapacitated && !inter.Source.IsSitting && owner.IsWithinRadius(inter.Source, InterceptAbilityHandler.INTERCEPT_DISTANCE))
                 {
-                    double interceptRoll;
-
-                    if (!Properties.OVERRIDE_DECK_RNG && playerOwner != null)
-                        interceptRoll = playerOwner.RandomDeck.GetPseudoDouble();
-                    else
-                        interceptRoll = Util.RandomDouble();
-
+                    double interceptRoll = owner.GetPseudoDouble(RandomDeckEvent.Intercept);
                     interceptRoll *= 100;
 
                     if (inter.InterceptChance > interceptRoll)
@@ -1694,7 +1631,7 @@ namespace DOL.GS
 
             if (intercept != null && !stealthStyle)
             {
-                if (intercept.Source is not GamePlayer || intercept.Stop())
+                if (intercept.Source is not GamePlayer || intercept.End())
                 {
                     ad.OriginalTarget = ad.Target;
                     ad.Target = intercept.Source;
@@ -1706,17 +1643,22 @@ namespace DOL.GS
 
             if (!defenseDisabled)
             {
+                // Savage style buffs.
+                foreach (ECSGameEffect savageBuff in owner.effectListComponent.GetEffects(eEffect.SavageBuff))
+                {
+                    if (!savageBuff.IsActive)
+                        continue;
+
+                    if (savageBuff.SpellHandler.Spell.SpellType is eSpellType.SavageStyleEvadeBuff or eSpellType.SavageStyleParryBuff)
+                        savageBuff.End();
+                }
+
                 if (lastAttackData != null && lastAttackData.AttackResult is not eAttackResult.HitStyle)
                     lastAttackData = null;
 
                 double evadeChance = owner.TryEvade(ad, lastAttackData);
                 ad.EvadeChance = evadeChance * 100;
-                double evadeRoll;
-
-                if (!Properties.OVERRIDE_DECK_RNG && playerOwner != null)
-                    evadeRoll = playerOwner.RandomDeck.GetPseudoDouble();
-                else
-                    evadeRoll = Util.RandomDouble();
+                double evadeRoll = owner.GetPseudoDouble(RandomDeckEvent.Evade);
 
                 if (evadeChance > 0)
                 {
@@ -1734,12 +1676,7 @@ namespace DOL.GS
                 {
                     double parryChance = owner.TryParry(ad, lastAttackData, AttackerTracker.MeleeCount);
                     ad.ParryChance = parryChance * 100;
-                    double parryRoll;
-
-                    if (!Properties.OVERRIDE_DECK_RNG && playerOwner != null)
-                        parryRoll = playerOwner.RandomDeck.GetPseudoDouble();
-                    else
-                        parryRoll = Util.RandomDouble();
+                    double parryRoll = owner.GetPseudoDouble(RandomDeckEvent.Parry);
 
                     if (parryChance > 0)
                     {
@@ -1787,12 +1724,7 @@ namespace DOL.GS
 
             if (missChance > 0)
             {
-                double missRoll;
-
-                if (!Properties.OVERRIDE_DECK_RNG && playerAttacker != null)
-                    missRoll = playerAttacker.RandomDeck.GetPseudoDouble();
-                else
-                    missRoll = Util.RandomDouble();
+                double missRoll = ad.Attacker.GetPseudoDouble(RandomDeckEvent.Miss);
 
                 if (playerAttacker != null && playerAttacker.UseDetailedCombatLog)
                 {
@@ -1822,20 +1754,41 @@ namespace DOL.GS
              * levels of the players involved into account.
              */
 
-            ECSGameEffect bladeturn = EffectListService.GetEffectOnTarget(owner, eEffect.Bladeturn);
-
-            if (bladeturn != null)
+            foreach (ECSGameEffect bladeturn in owner.effectListComponent.GetEffects(eEffect.Bladeturn))
             {
+                if (!bladeturn.IsActive)
+                    continue;
+
                 bool penetrate = false;
 
-                if (stealthStyle)
-                    return eAttackResult.HitUnstyled; // Exit early for stealth to prevent breaking bubble but still register a hit.
+                /*
+                 * 1.39:
+                 * When an Assassin class (i.e. Infiltrator, Shadowblade, Nightshade) attacks from a hidden position
+                 * (i.e. when doing a critical strike backstab), the attack cannot be parried, evaded, blocked or bladeturned.
+                 * Please note that the attacker can simply miss, however, which leaves a bladeturn active.
+                 */
 
-                if (ad.Attacker.Level > bladeturn.SpellHandler.Caster.Level && !Util.ChanceDouble(bladeturn.SpellHandler.Caster.Level / (double) ad.Attacker.Level))
+                /*
+                 * 1.82:
+                 * Critical strike styles that require the attacker to be stealthed will now destroy any bladeturn spell.
+                 * The attack will hit the target unhindered. (Note: Before this change, the critical strike style would simply bypass the bladeturn,
+                 * and the bladeturn would still block the next style. With this change, the critical strike style will actually destroy the bladeturn,
+                 * preventing it from blocking the next style following the critical strike.)
+                 */
+
+                // What the 1.82 notes describe cannot be confirmed on any era accurate videos,
+                // where stealth openers appear to always penetrate and break the bladeturn.
+                // See https://uthgard.net/tracker/issue/4174/@/Bladeturn_destroyed_with_CS_styles for a couple of examples.
+
+                // Extra comments https://archives.jeuxonline.info/fils/153358.html
+
+                if (stealthStyle)
+                    penetrate = true;
+                else if (ad.Attacker.Level > bladeturn.SpellHandler.Caster.Level && !Util.Chance(bladeturn.SpellHandler.Caster.Level / (double) ad.Attacker.Level))
                     penetrate = true;
                 else if (ad.AttackType is AttackData.eAttackType.Ranged)
                 {
-                    double effectivenessAgainstBladeturn = CheckEffectivenessAgainstBladeturn(bladeturn);
+                    double effectivenessAgainstBladeturn = CheckEffectivenessAgainstBladeturn(ad.Attacker, action, bladeturn);
 
                     if (effectivenessAgainstBladeturn > 0)
                         penetrate = true;
@@ -1843,7 +1796,7 @@ namespace DOL.GS
                     effectiveness *= effectivenessAgainstBladeturn;
                 }
 
-                if (bladeturn.Stop())
+                if (bladeturn.End())
                 {
                     if (penetrate)
                         playerOwner?.Out.SendMessage(LanguageMgr.GetTranslation(playerOwner.Client.Account.Language, "GameLiving.CalculateEnemyAttackResult.BlowPenetrated"), eChatType.CT_SpellResisted, eChatLoc.CL_SystemWindow);
@@ -1857,6 +1810,7 @@ namespace DOL.GS
                             playerOwner.Stealth(false);
                         }
 
+                        ad.MissChance = 100;
                         return eAttackResult.Missed;
                     }
                 }
@@ -1866,19 +1820,19 @@ namespace DOL.GS
                 playerOwner.IsOnHorse = false;
 
             return eAttackResult.HitUnstyled;
+        }
 
-            double CheckEffectivenessAgainstBladeturn(ECSGameEffect bladeturn)
-            {
-                // 1.62: Longshot and Volley always penetrate.
-                if (action.RangedAttackType is eRangedAttackType.Long or eRangedAttackType.Volley)
-                    return 1.0;
+        private double CheckEffectivenessAgainstBladeturn(GameLiving attacker, WeaponAction action, ECSGameEffect bladeturn)
+        {
+            // 1.62: Longshot and Volley always penetrate.
+            if (action.RangedAttackType is eRangedAttackType.Long or eRangedAttackType.Volley)
+                return 1.0;
 
-                // 1.62: Penetrating Arrow penetrates only if the caster != target.
-                if (owner == bladeturn.SpellHandler.Caster)
-                    return 0.0;
+            // 1.62: Penetrating Arrow penetrates only if the caster != target.
+            if (owner == bladeturn.SpellHandler.Caster)
+                return 0.0;
 
-                return 0.25 + ad.Attacker.GetAbilityLevel(Abilities.PenetratingArrow) * 0.25;
-            }
+            return 0.25 + attacker.GetAbilityLevel(Abilities.PenetratingArrow) * 0.25;
         }
 
         private static readonly IReadOnlyDictionary<eAttackResult, string> _simpleAttackMessageKeys = new Dictionary<eAttackResult, string>
@@ -2153,8 +2107,11 @@ namespace DOL.GS
 
         public int CalculateCriticalDamage(AttackData ad)
         {
-            if (!Util.Chance(ad.CriticalChance))
+            if (!owner.Chance(RandomDeckEvent.CriticalChance, ad.CriticalChance))
                 return 0;
+
+            double min = 0.1;
+            double max;
 
             if (owner is GamePlayer)
             {
@@ -2162,8 +2119,6 @@ namespace DOL.GS
                 if (EffectListService.GetAbilityEffectOnTarget(ad.Target, eEffect.TripleWield) != null)
                     return 0;
 
-                int critMin;
-                int critMax;
                 ECSGameEffect berserk = EffectListService.GetEffectOnTarget(owner, eEffect.Berserk);
 
                 if (berserk != null)
@@ -2171,39 +2126,21 @@ namespace DOL.GS
                     int level = owner.GetAbilityLevel(Abilities.Berserk);
                     // https://web.archive.org/web/20061017095337/http://daoc.catacombs.com/forum.cfm?ThreadKey=10833&DefMessage=922046&forum=37
                     // 1% min is weird. Raised to 10%.
+                    // https://web.archive.org/web/20041101133819/http://www.camelotherald.com/more/720.php
                     // Berserk 1 = 10-25%
                     // Berserk 2 = 10-50%
                     // Berserk 3 = 10-75%
-                    // Berserk 4 = 10-99%
-                    critMin = (int) (ad.Damage * 0.1);
-                    critMax = (int) (Math.Min(0.99, level * 0.25) * ad.Damage);
+                    // Berserk 4 = 10-100%
+                    max = Math.Min(1.0, level * 0.25);
                 }
                 else
-                {
-                    // Min crit damage is 10%.
-                    critMin = (int) (ad.Damage * 0.1);
-
-                    // Max crit damage to players is 50%.
-                    if (ad.Target is GamePlayer)
-                        critMax = ad.Damage / 2;
-                    else
-                        critMax = ad.Damage;
-                }
-
-                critMin = Math.Max(critMin, 0);
-                critMax = Math.Max(critMin, critMax);
-                return Util.Random(critMin, critMax);
+                    max = ad.Target is GamePlayer ? 0.5 : 1.0;
             }
             else
-            {
-                int maxCriticalDamage = ad.Target is GamePlayer ? ad.Damage / 2 : ad.Damage;
-                int minCriticalDamage = (int) (ad.Damage * MinMeleeCriticalDamage);
+                max = ad.Target is GamePlayer ? 0.5 : 1.0;
 
-                if (minCriticalDamage > maxCriticalDamage)
-                    minCriticalDamage = maxCriticalDamage;
-
-                return Util.Random(minCriticalDamage, maxCriticalDamage);
-            }
+            double criticalMod = min + owner.GetPseudoDoubleIncl(RandomDeckEvent.CriticalVariance) * (max - min);
+            return (int) (ad.Damage * criticalMod);
         }
 
         public double GetMissChance(WeaponAction action, AttackData ad, AttackData lastAD, DbInventoryItem weapon)
@@ -2307,12 +2244,6 @@ namespace DOL.GS
             }
         }
 
-        /// <summary>
-        /// Minimum melee critical damage as a percentage of the
-        /// raw damage.
-        /// </summary>
-        protected float MinMeleeCriticalDamage => 0.1f;
-
         public static double CalculateSlowWeaponDamageModifier(DbInventoryItem weapon)
         {
             // Slow weapon bonus as found here: https://www2.uthgard.net/tracker/issue/2753/@/Bow_damage_variance_issue_(taking_item_/_spec_???)
@@ -2348,7 +2279,7 @@ namespace DOL.GS
 
             if (specLevel > 0)
             {
-                int bonus = owner.GetModified(eProperty.OffhandChance) + owner.GetModified(eProperty.OffhandDamageAndChance);
+                int bonus = owner.GetModified(eProperty.OffhandDamageAndChance);
                 return 25 + specLevel * 68 * 0.01 + bonus;
             }
 
@@ -2368,7 +2299,7 @@ namespace DOL.GS
             double doubleSwingChance = specLevel * 0.5; // specLevel >> 1
             double tripleSwingChance = specLevel >= 25 ? doubleSwingChance * 0.5 : 0; // specLevel >> 2
             double quadSwingChance = specLevel >= 40 ? tripleSwingChance * 0.25 : 0; // specLevel >> 4
-            int bonus = owner.GetModified(eProperty.OffhandChance) + owner.GetModified(eProperty.OffhandDamageAndChance);
+            int bonus = owner.GetModified(eProperty.OffhandDamageAndChance);
             doubleSwingChance += bonus; // It's apparently supposed to only affect double swing chance around 1.65, which puts it more in line with DW / CD.
             return (doubleSwingChance, tripleSwingChance, quadSwingChance);
         }
@@ -2387,7 +2318,7 @@ namespace DOL.GS
                 if (mainWeapon == null || mainWeapon.SlotPosition is not Slot.RIGHTHAND)
                     return 0;
 
-                double random = Util.RandomDouble() * 100;
+                double random = owner.GetPseudoDouble(RandomDeckEvent.DualWield) * 100;
                 return random < npcOwner.LeftHandSwingChance ? 1 : 0;
             }
 
@@ -2410,7 +2341,7 @@ namespace DOL.GS
 
             if (leftHandSwingChance > 0)
             {
-                double random = Util.RandomDouble() * 100;
+                double random = owner.GetPseudoDouble(RandomDeckEvent.DualWield) * 100;
 
                 if (playerOwner != null && playerOwner.UseDetailedCombatLog)
                     playerOwner.Out.SendMessage($"OH swing%: {leftHandSwingChance:0.##}\n", eChatType.CT_DamageAdd, eChatLoc.CL_SystemWindow);
@@ -2422,7 +2353,7 @@ namespace DOL.GS
 
             if (doubleSwingChance > 0)
             {
-                double random = Util.RandomDouble() * 100;
+                double random = owner.GetPseudoDouble(RandomDeckEvent.DualWield) * 100;
 
                 if (playerOwner != null && playerOwner.UseDetailedCombatLog)
                     playerOwner.Out.SendMessage( $"Chance for 2 swings: {doubleSwingChance:0.##}% | 3 swings: {tripleSwingChance:0.##}% | 4 swings: {quadSwingChance:0.##}% \n", eChatType.CT_DamageAdd, eChatLoc.CL_SystemWindow);
@@ -2446,12 +2377,12 @@ namespace DOL.GS
 
         public double CalculateLeftAxeModifier()
         {
-            int LeftAxeSpec = owner.GetModifiedSpecLevel(Specs.Left_Axe);
+            int leftAxeSpec = owner.GetModifiedSpecLevel(Specs.Left_Axe);
 
-            if (LeftAxeSpec == 0)
+            if (leftAxeSpec == 0)
                 return 1.0;
 
-            double modifier = 0.625 + 0.0034 * LeftAxeSpec;
+            double modifier = 0.625 + 0.0034 * leftAxeSpec;
 
             if (owner.GetModified(eProperty.OffhandDamageAndChance) > 0)
                 return modifier + owner.GetModified(eProperty.OffhandDamageAndChance) * 0.01;

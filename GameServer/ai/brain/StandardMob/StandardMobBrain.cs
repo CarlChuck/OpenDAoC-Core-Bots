@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,13 +33,14 @@ namespace DOL.AI.Brain
         /// </summary>
         public StandardMobBrain() : base()
         {
-            FSM = new FSM();
+            FSM = new();
             FSM.Add(new StandardMobState_WAKING_UP(this));
             FSM.Add(new StandardMobState_IDLE(this));
             FSM.Add(new StandardMobState_AGGRO(this));
             FSM.Add(new StandardMobState_RETURN_TO_SPAWN(this));
             FSM.Add(new StandardMobState_PATROLLING(this));
             FSM.Add(new StandardMobState_ROAMING(this));
+            _aggroLosCheckListener = new(this);
         }
 
         /// <summary>
@@ -76,7 +78,7 @@ namespace DOL.AI.Brain
             FireAmbientSentence();
 
             // Check aggro only if our aggro list is empty and we're not in combat.
-            if (AggroLevel > 0 && AggroRange > 0 && Body.CurrentSpellHandler == null && !HasAggro && !IsWaitingForLosCheck)
+            if (AggroLevel > 0 && AggroRange > 0 && Body.CurrentSpellHandler == null && !HasAggro && !_aggroLosCheckListener.HasPendingLosChecks)
             {
                 CheckPlayerAggro();
                 CheckNpcAggro();
@@ -85,17 +87,6 @@ namespace DOL.AI.Brain
             // Some calls rely on this method to return if there's something in the aggro list, not necessarily to perform a proximity aggro check.
             // But this doesn't necessarily return whether or not the check was positive, only the current state (LoS checks take time).
             return HasAggro;
-        }
-
-        public virtual bool HasPatrolPath()
-        {
-            return Body.MaxSpeedBase > 0 &&
-                Body.CurrentSpellHandler == null &&
-                !Body.IsMoving &&
-                !Body.attackComponent.AttackState &&
-                !Body.InCombat &&
-                !Body.IsMovingOnPath &&
-                !string.IsNullOrEmpty(Body.PathID);
         }
 
         /// <summary>
@@ -115,10 +106,10 @@ namespace DOL.AI.Brain
                     continue;
 
                 if (Properties.CHECK_LOS_BEFORE_AGGRO)
-                    SendLosCheckForAggro(player, player);
+                    SendAggroLosCheck(player, player);
                 else
                 {
-                    AddToAggroList(player, 1);
+                    AddToAggroList(player);
                     return;
                 }
 
@@ -144,19 +135,25 @@ namespace DOL.AI.Brain
                     // Check LoS if either the target or the current mob is a pet
                     if (npc.Brain is ControlledMobBrain theirControlledNpcBrain && theirControlledNpcBrain.GetPlayerOwner() is GamePlayer theirOwner)
                     {
-                        SendLosCheckForAggro(theirOwner, npc);
+                        SendAggroLosCheck(theirOwner, npc);
                         continue;
                     }
                     else if (this is ControlledMobBrain ourControlledNpcBrain && ourControlledNpcBrain.GetPlayerOwner() is GamePlayer ourOwner)
                     {
-                        SendLosCheckForAggro(ourOwner, npc);
+                        SendAggroLosCheck(ourOwner, npc);
                         continue;
                     }
                 }
 
-                AddToAggroList(npc, 1);
+                AddToAggroList(npc);
                 return;
             }
+        }
+
+        protected void SendAggroLosCheck(GamePlayer losChecker, GameObject target)
+        {
+            if (losChecker.Out.SendLosCheckRequest(Body, target, _aggroLosCheckListener))
+                _aggroLosCheckListener.OnLosCheckStarted();
         }
 
         public virtual void FireAmbientSentence()
@@ -239,7 +236,7 @@ namespace DOL.AI.Brain
         /// </summary>
         public virtual int AggroLevel { get; set; }
 
-        private ConcurrentDictionary<GameLiving, AggroAmount> _tempAggroList = new();
+        private ConcurrentDictionary<GameLiving, AggroAmount> _tempAggroList;
         protected ConcurrentDictionary<GameLiving, AggroAmount> AggroList { get; private set; } = new();
         protected List<OrderedAggroListElement> OrderedAggroList { get; private set; } = new();
         protected readonly Lock _orderedAggroListLock = new();
@@ -273,7 +270,7 @@ namespace DOL.AI.Brain
                 brain.AddToAggroList(pair.Key, pair.Value.Base);
         }
 
-        public virtual void AddToAggroList(GameLiving living, long aggroAmount)
+        public virtual void AddToAggroList(GameLiving living, long aggroAmount = 0)
         {
             if (Body.IsConfused || !Body.IsAlive || living == null)
                 return;
@@ -281,7 +278,7 @@ namespace DOL.AI.Brain
             ForceAddToAggroList(living, aggroAmount);
         }
 
-        public void ForceAddToAggroList(GameLiving living, long aggroAmount)
+        public void ForceAddToAggroList(GameLiving living, long aggroAmount = 0)
         {
             if (aggroAmount > 0)
             {
@@ -324,13 +321,21 @@ namespace DOL.AI.Brain
 
             if (living is GamePlayer player)
             {
+                AddPetAndSubPetsToAggroList(player);
+
                 // Add the whole group to the aggro list.
+                // This is done on every attack, but we may consider doing it only once per group, somehow.
                 if (player.Group != null)
                 {
                     foreach (GamePlayer playerInGroup in player.Group.GetPlayersInTheGroup())
                     {
                         if (playerInGroup != living)
-                            AggroList.TryAdd(playerInGroup, new());
+                        {
+                            if (!AggroList.ContainsKey(playerInGroup))
+                                AggroList.TryAdd(playerInGroup, new(0));
+
+                            AddPetAndSubPetsToAggroList(playerInGroup);
+                        }
                     }
                 }
             }
@@ -344,13 +349,45 @@ namespace DOL.AI.Brain
 
             static AggroAmount Add(GameLiving key, long arg)
             {
-                return new(Math.Max(0, arg));
+                // Always add at least 1 if the key is not present to ensure the NPC goes to the puller and not a group member.
+                // It's still technically possible for two group members to pull at the exact same time, but this should be fine.
+                return new(Math.Max(1, arg));
             }
 
             static AggroAmount Update(GameLiving key, AggroAmount oldValue, long arg)
             {
                 oldValue.Base = Math.Max(0, oldValue.Base + arg);
                 return oldValue;
+            }
+        }
+
+        private void AddPetAndSubPetsToAggroList(GamePlayer player)
+        {
+            GameNPC pet = player.ControlledBrain?.Body;
+
+            if (pet == null)
+                return;
+
+            if (!AggroList.ContainsKey(pet))
+                AggroList.TryAdd(pet, new(0));
+
+            IControlledBrain[] controlledBrains = pet.ControlledNpcList;
+
+            if (controlledBrains == null)
+                return;
+
+            foreach (IControlledBrain subPetBrain in controlledBrains)
+            {
+                if (subPetBrain == null)
+                    continue;
+
+                GameNPC subPet = subPetBrain.Body;
+
+                if (subPet == null)
+                    continue;
+
+                if (!AggroList.ContainsKey(subPet))
+                    AggroList.TryAdd(subPet, new(0));
             }
         }
 
@@ -388,7 +425,9 @@ namespace DOL.AI.Brain
 
         public bool UnsetTemporaryAggroList()
         {
-            if (_tempAggroList == null)
+            // Keep the current aggro list if the previous one is empty.
+            // This can happen when amnesia is used during confusion.
+            if (_tempAggroList == null || _tempAggroList.IsEmpty)
                 return false;
 
             AggroList = _tempAggroList;
@@ -412,6 +451,7 @@ namespace DOL.AI.Brain
         {
             CanBaf = true; // Mobs that drop out of combat can BAF again.
             AggroList.Clear();
+            _tempAggroList = null;
 
             lock (_orderedAggroListLock)
             {
@@ -448,52 +488,74 @@ namespace DOL.AI.Brain
 
             if (CheckSpells(eCheckSpellType.Offensive))
                 Body.StopAttack();
-            else
+            else if (!Body.IsCasting)
                 Body.StartAttack(newTarget);
         }
 
-        private int _pendingLosCheckCount;
-        public int PendingLosCheckCount => _pendingLosCheckCount;
-        public bool IsWaitingForLosCheck => Interlocked.CompareExchange(ref _pendingLosCheckCount, 0, 0) > 0;
-        protected virtual bool CanAddToAggroListFromMultipleLosChecks => false;
-
-        protected void SendLosCheckForAggro(GamePlayer player, GameObject target)
+        public virtual void Disengage()
         {
-            if (player.Out.SendCheckLos(Body, target, new CheckLosResponse(LosCheckForAggroCallback)))
-                Interlocked.Increment(ref _pendingLosCheckCount);
+            ClearAggroList();
+            Body.StopAttack();
+            Body.StopCurrentSpellcast();
+            Body.TargetObject = null;
         }
 
-        protected void LosCheckForAggroCallback(GamePlayer player, LosCheckResponse response, ushort sourceOID, ushort targetOID)
-        {
-            // This method should not be allowed to be executed at the same time as `CheckPlayerAggro` or `CheckNPCAggro`.
-            if (response is LosCheckResponse.True)
-            {
-                if (!HasAggro || CanAddToAggroListFromMultipleLosChecks)
-                {
-                    GameObject gameObject = Body.CurrentRegion.GetObject(targetOID);
+        private readonly AggroLosCheckListener _aggroLosCheckListener;
+        public int PendingAggroLosCheckCount => _aggroLosCheckListener.PendingLosCheckCount;
+        protected virtual bool CanAddToAggroListFromMultipleLosChecks => false;
 
-                    if (gameObject is GameLiving gameLiving)
-                        AddToAggroList(gameLiving, 1);
+        private class AggroLosCheckListener : ILosCheckListener
+        {
+            private StandardMobBrain _owner;
+            private int _pendingLosCheckCount;
+            public int PendingLosCheckCount => Volatile.Read(ref _pendingLosCheckCount);
+            public bool HasPendingLosChecks => PendingLosCheckCount > 0;
+
+            public AggroLosCheckListener(StandardMobBrain owner)
+            {
+                _owner = owner;
+            }
+
+            public void HandleLosCheckResponse(GamePlayer player, LosCheckResponse response, ushort targetId)
+            {
+                try
+                {
+                    if (response is LosCheckResponse.True)
+                    {
+                        if (!_owner.HasAggro || _owner.CanAddToAggroListFromMultipleLosChecks)
+                        {
+                            GameObject gameObject = _owner.Body.CurrentRegion.GetObject(targetId);
+
+                            if (gameObject is GameLiving gameLiving)
+                                _owner.AddToAggroList(gameLiving);
+                        }
+                    }
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _pendingLosCheckCount);
                 }
             }
 
-            Interlocked.Decrement(ref _pendingLosCheckCount);
+            public void OnLosCheckStarted()
+            {
+                Interlocked.Increment(ref _pendingLosCheckCount);
+            }
         }
 
         protected virtual bool ShouldBeRemovedFromAggroList(GameLiving living)
         {
             // Keep Necromancer shades so that we can attack them if their pets die.
             return !living.IsAlive ||
-                   living.ObjectState != GameObject.eObjectState.Active ||
                    living.CurrentRegion != Body.CurrentRegion ||
-                   !Body.IsWithinRadius(living, MAX_AGGRO_LIST_DISTANCE) ||
                    (!GameServer.ServerRules.IsAllowedToAttack(Body, living, true) && !living.effectListComponent.ContainsEffectForEffectType(eEffect.Shade));
         }
 
         protected virtual bool ShouldBeIgnoredFromAggroList(GameLiving living)
         {
             // We're keeping shades in the aggro list so that mobs attack them after their pet dies, so they need to be filtered out here.
-            return living.effectListComponent.ContainsEffectForEffectType(eEffect.Shade);
+            // We also keep entities outside MAX_AGGRO_LIST_DISTANCE in case they come back.
+            return living.effectListComponent.ContainsEffectForEffectType(eEffect.Shade) || !Body.IsWithinRadius(living, MAX_AGGRO_LIST_DISTANCE);
         }
 
         protected virtual GameLiving CleanUpAggroListAndGetHighestModifiedThreat()
@@ -623,7 +685,7 @@ namespace DOL.AI.Brain
             if (!ad.GeneratesAggro || !Body.IsAlive || Body.ObjectState is not GameObject.eObjectState.Active || FSM.GetCurrentState() == FSM.GetState(eFSMStateType.PASSIVE))
                 return;
 
-            int damage = Math.Max(1, ad.Damage + ad.CriticalDamage);
+            int damage = Math.Max(0, ad.Damage + ad.CriticalDamage);
             GameLiving attacker = ad.Attacker;
 
             if (attacker is GameNPC NpcAttacker && NpcAttacker.Brain is ControlledMobBrain controlledBrain)
@@ -631,20 +693,9 @@ namespace DOL.AI.Brain
                 damage = controlledBrain.ModifyDamageWithTaunt(damage);
 
                 // A pet generates 100% of the aggro from its damage; the owner receives 30% additional aggro as a tag, without reducing the pet's contribution.
-                int aggroForOwner = (int) (damage * 0.3);
-
-                // We must ensure that the same amount of aggro isn't added for both, otherwise an out-of-combat mob could attack the owner when their pet engages it.
-                // The owner must also always generate at least 1 aggro.
-                if (aggroForOwner == 0)
-                {
-                    AddToAggroList(controlledBrain.Owner, 1);
-                    AddToAggroList(NpcAttacker, Math.Max(2, damage));
-                }
-                else
-                {
-                    AddToAggroList(controlledBrain.Owner, aggroForOwner);
-                    AddToAggroList(NpcAttacker, damage);
-                }
+                // The pet should be added first to the aggro list in case the attack does no damage (see `AddToAggroList` implementation).
+                AddToAggroList(NpcAttacker, damage);
+                AddToAggroList(controlledBrain.Owner, (int) (damage * 0.3));
             }
             else
                 AddToAggroList(attacker, damage);
@@ -674,8 +725,16 @@ namespace DOL.AI.Brain
 
         protected virtual void BringFriends(GameLiving puller)
         {
-            if (!CanBaf || Body.Faction == null)
+            // BaF only happens once.
+            if (!CanBaf)
                 return;
+
+            // BaF only happens if the NPC has a faction, and if it was attacked (no BAF on body pull).
+            if (Body.Faction == null || Body.attackComponent.AttackerTracker.Count == 0)
+            {
+                _canBaf = false;
+                return;
+            }
 
             GamePlayer playerPuller;
 
@@ -704,12 +763,13 @@ namespace DOL.AI.Brain
             if (Body.CurrentZone.IsDungeon)
                 bafRadius = (int) (bafRadius * BAF_RADIUS_DUNGEON_MODIFIER);
 
-            IEnumerable<StandardMobBrain> brainsInRadius = GetFriendlyAndAvailableBrainsInRadiusOrderedByDistance(bafRadius, maxAdds);
-            int addCount = brainsInRadius.Count();
+            List<GameNPC> brainsInRadius = GetFriendlyAndAvailableNpcsInRadiusOrderedByDistance(bafRadius, maxAdds);
+            int addCount = brainsInRadius.Count;
             BafAddCount = addCount;
 
-            foreach (StandardMobBrain brain in brainsInRadius)
+            foreach (GameNPC npc in brainsInRadius)
             {
+                StandardMobBrain brain = npc.Brain as StandardMobBrain; // Guaranteed by GetFriendlyAndAvailableNpcsInRadiusOrderedByDistance.
                 brain.CanBaf = false;
                 brain.BafAddCount = addCount;
                 GameLiving target;
@@ -719,7 +779,7 @@ namespace DOL.AI.Brain
                 else
                     target = puller;
 
-                brain.AddToAggroList(target, 1);
+                brain.AddToAggroList(target);
             }
 
             static int GetMaxAddsCountFromBaf(GamePlayer puller, out List<GamePlayer> otherTargets, out int attackersCount)
@@ -796,26 +856,105 @@ namespace DOL.AI.Brain
             }
         }
 
-        public IEnumerable<StandardMobBrain> GetFriendlyAndAvailableBrainsInRadiusOrderedByDistance(int radius, int count)
+        public List<GameNPC> GetFriendlyAndAvailableNpcsInRadiusOrderedByDistance(int radius, int count)
         {
-            return Body.GetNPCsInRadius((ushort) radius).Where(WherePredicate).OrderBy(OrderByPredicate).Take(count).Select(SelectPredicate);
+            List<GameNPC> finalNpcs = GameLoop.GetListForTick<GameNPC>();
 
-            bool WherePredicate(GameNPC npc)
+            if (count <= 0)
+                return finalNpcs;
+
+            NpcWithDistance[] candidates = ArrayPool<NpcWithDistance>.Shared.Rent(count);
+
+            try
             {
-                return npc != Body && npc.IsFriend(Body) && npc.IsAggressive && npc.IsAvailableToJoinFight;
+                int candidateCount = 0;
+
+                foreach (GameNPC npc in Body.GetNPCsInRadius((ushort) radius))
+                {
+                    if (npc == Body || !npc.IsFriend(Body) || !npc.IsAggressive || !npc.IsAvailableToJoinFight || npc.Brain is not StandardMobBrain)
+                        continue;
+
+                    long xDiff = Body.X - npc.X;
+                    long yDiff = Body.Y - npc.Y;
+                    long zDiff = Body.Z - npc.Z;
+                    long distSq = xDiff * xDiff + yDiff * yDiff + zDiff * zDiff;
+
+                    if (candidateCount < count)
+                    {
+                        candidates[candidateCount++] = new(npc, distSq);
+
+                        // Build the heap when we have enough candidates.
+                        if (candidateCount == count)
+                        {
+                            for (int i = count / 2 - 1; i >= 0; i--)
+                                HeapifyDown(candidates, i, count);
+                        }
+                    }
+                    else if (distSq < candidates[0].DistanceSq)
+                    {
+                        candidates[0] = new(npc, distSq);
+                        HeapifyDown(candidates, 0, count);
+                    }
+                }
+
+                if (candidateCount > 0)
+                {
+                    Array.Sort(candidates, 0, candidateCount, NpcDistanceComparer.Instance);
+
+                    for (int i = 0; i < candidateCount; i++)
+                        finalNpcs.Add(candidates[i].Npc);
+                }
+
+                return finalNpcs;
+            }
+            finally
+            {
+                ArrayPool<NpcWithDistance>.Shared.Return(candidates);
             }
 
-            long OrderByPredicate(GameNPC npc)
+            static void HeapifyDown(NpcWithDistance[] heap, int index, int heapSize)
             {
-                int xDiff = Body.X - npc.X;
-                int yDiff = Body.Y - npc.Y;
-                int zDiff = Body.Z - npc.Z;
-                return xDiff * xDiff + yDiff * yDiff + zDiff * zDiff;
-            }
+                int largest = index;
 
-            static StandardMobBrain SelectPredicate(GameNPC npc)
+                while (true)
+                {
+                    int currentIndex = largest;
+                    int left = 2 * currentIndex + 1;
+                    int right = 2 * currentIndex + 2;
+
+                    if (left < heapSize && heap[left].DistanceSq > heap[largest].DistanceSq)
+                        largest = left;
+
+                    if (right < heapSize && heap[right].DistanceSq > heap[largest].DistanceSq)
+                        largest = right;
+
+                    if (largest == currentIndex)
+                        break;
+
+                    (heap[currentIndex], heap[largest]) = (heap[largest], heap[currentIndex]);
+                }
+            }
+        }
+
+        private readonly struct NpcWithDistance
+        {
+            public readonly GameNPC Npc;
+            public readonly long DistanceSq;
+
+            public NpcWithDistance(GameNPC npc, long distanceSq)
             {
-                return npc.Brain as StandardMobBrain;
+                Npc = npc;
+                DistanceSq = distanceSq;
+            }
+        }
+
+        private class NpcDistanceComparer : IComparer<NpcWithDistance>
+        {
+            public static readonly NpcDistanceComparer Instance = new();
+
+            public int Compare(NpcWithDistance a, NpcWithDistance b)
+            {
+                return a.DistanceSq.CompareTo(b.DistanceSq);
             }
         }
 
@@ -1008,6 +1147,7 @@ namespace DOL.AI.Brain
         {
             GameLiving target = null;
 
+            // This does not include every spell type.
             switch (spell.SpellType)
             {
                 #region Buffs

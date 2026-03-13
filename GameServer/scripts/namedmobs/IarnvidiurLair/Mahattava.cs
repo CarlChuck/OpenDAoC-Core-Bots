@@ -141,12 +141,11 @@ namespace DOL.AI.Brain
 					spell.Duration = 20;
 					spell.Frequency = 40;
 					spell.SpellID = 11804;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DamageOverTime.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Matter;
 					m_Mahattava_Dot = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Mahattava_Dot);
 				}
 				return m_Mahattava_Dot;
 			}
@@ -169,12 +168,11 @@ namespace DOL.AI.Brain
 					spell.Range = 1500;
 					spell.Damage = 300;
 					spell.SpellID = 11804;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Matter; 
 					m_Mahattava_DD = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Mahattava_DD);
 				}
 				return m_Mahattava_DD;
 			}

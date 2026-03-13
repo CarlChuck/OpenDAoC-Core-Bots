@@ -69,11 +69,10 @@ namespace DOL.AI.Brain
 					spell.Range = 1500;
 					spell.Value = 17;
 					spell.SpellID = 11971;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.CombatSpeedDebuff.ToString();
 					spell.DamageType = (int)eDamageType.Body;
 					m_KoalinthElder_HasteDebuff = new Spell(spell, 13);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_KoalinthElder_HasteDebuff);
 				}
 				return m_KoalinthElder_HasteDebuff;
 			}

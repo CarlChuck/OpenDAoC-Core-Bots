@@ -92,10 +92,9 @@ namespace DOL.GS
 					spell.Name = "Stun";
 					spell.Range = 400;
 					spell.SpellID = 11890;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.Stun.ToString();
 					m_Mortufoghus_stun = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Mortufoghus_stun);
 				}
 				return m_Mortufoghus_stun;
 			}
@@ -201,10 +200,9 @@ namespace DOL.AI.Brain
 					spell.Range = 500;
 					spell.Radius = 1000;
 					spell.SpellID = 11891;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					m_MortufoghusDD = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_MortufoghusDD);
 				}
 				return m_MortufoghusDD;
 			}

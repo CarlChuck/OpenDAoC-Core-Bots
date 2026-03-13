@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using DOL.Database;
 using DOL.GS.PacketHandler;
+using static DOL.GS.NpcTemplateMgr;
 
 namespace DOL.GS.Commands
 {
-    [CmdAttribute("&targetstats",
+    [Cmd("&targetstats",
         ePrivLevel.Player,
         "Display various combat related info about your target",
         "/targetstats")]
@@ -28,12 +29,11 @@ namespace DOL.GS.Commands
             AddDefenseInfo(info, target);
             AddMiscellaneousInfo(info, target);
 
-            client.Out.SendCustomTextWindow($"[{target.Name}]", info);
+            client.Out.SendCustomTextWindow($"[{target.Name} stats]", info);
 
             static bool TryValidateTarget(GameClient client, out GameLiving target)
             {
-                target = client.Player.TargetObject as GameLiving;
-                target ??= client.Player;
+                target = (client.Player.TargetObject as GameLiving) ?? client.Player;
 
                 if (target == null)
                 {
@@ -88,10 +88,8 @@ namespace DOL.GS.Commands
 
                 static void AddWeaponInfo(List<string> info, string header, GameClient client, GameLiving target, DbInventoryItem weapon, AttackData.eAttackType attackType)
                 {
-                    double weaponDamage = target.attackComponent.AttackDamage(weapon, null, out double weaponDamageCap);
-                    double effectiveness = target.attackComponent.CalculateEffectiveness(weapon);
-                    weaponDamage *= effectiveness;
-                    weaponDamageCap *= effectiveness;
+                    double weaponDamage = target.attackComponent.WeaponDamage(weapon, null, target.Effectiveness, out double weaponDamageCap);
+                    weaponDamage *= target.attackComponent.CalculateDamageTypeModifier(weapon);
 
                     info.Add("");
                     info.Add(header);
@@ -197,7 +195,6 @@ namespace DOL.GS.Commands
                 parries[0] = target.GetModified(eProperty.ParryChance) * 0.001;
                 blocks[0] = target.GetModified(eProperty.BlockChance) * 0.001;
 
-
                 for (int i = 1; i < spanLength; i++)
                 {
                     dummyAttackData.AttackType = attackTypes[i - 1];
@@ -219,8 +216,19 @@ namespace DOL.GS.Commands
                 info.Add("+ Miscellaneous:");
                 info.Add($"Level:  {target.Level}");
                 info.Add($"Health:  {target.Health} / {target.MaxHealth}");
-                info.Add($"Power:  {target.Mana} / {target.MaxMana}");
+
+                if (target is GamePlayer)
+                    info.Add($"Power:  {target.Mana} / {target.MaxMana}");
+
                 info.Add($"Movement speed:  {target.movementComponent.CurrentSpeed} / {target.movementComponent.MaxSpeed}");
+
+                if (target is GameNPC npc)
+                {
+                    eBodyType bodyType = (eBodyType) npc.BodyType;
+
+                    if (bodyType is not eBodyType.None)
+                        info.Add($"Type:  {bodyType}");
+                }
             }
         }
     }

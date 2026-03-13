@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading;
 using DOL.Logging;
+using DOL.Timing;
 using ECS.Debug;
 
 namespace DOL.GS
@@ -52,9 +53,9 @@ namespace DOL.GS
 
                 if (GameServiceUtils.ShouldTick(timer.NextTick))
                 {
-                    long startTick = GameLoop.GetRealTime();
+                    long startTick = MonotonicTime.NowMs;
                     timer.Tick();
-                    long stopTick = GameLoop.GetRealTime();
+                    long stopTick = MonotonicTime.NowMs;
 
                     if (stopTick - startTick > Diagnostics.LongTickThreshold)
                         log.Warn($"Long {Instance.ServiceName}.{nameof(Tick)} for Timer Callback: {timer.CallbackInfo?.DeclaringType}:{timer.CallbackInfo?.Name}  Owner: {timer.Owner?.Name} Time: {stopTick - startTick}ms");
@@ -78,7 +79,7 @@ namespace DOL.GS
         public long NextTick { get; protected set; }
         public bool IsAlive { get; private set; }
         public int TimeUntilElapsed => (int) (NextTick - GameLoop.GameLoopTime);
-        public ServiceObjectId ServiceObjectId { get; set; } = new(ServiceObjectType.Timer);
+        public ServiceObjectId ServiceObjectId { get; } = new(ServiceObjectType.Timer);
         private PropertyCollection _properties;
 
         public ECSGameTimer(GameObject timerOwner)

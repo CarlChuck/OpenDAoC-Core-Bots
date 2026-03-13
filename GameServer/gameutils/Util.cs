@@ -50,7 +50,7 @@ namespace DOL.GS
             return chancePercent > _random.Next(100);
         }
 
-        public static bool ChanceDouble(double chancePercent)
+        public static bool Chance(double chancePercent)
         {
             return chancePercent > _random.NextDouble();
         }
@@ -82,11 +82,6 @@ namespace DOL.GS
 
         private const char PRIMARY_CSV_SEPARATOR = ';';
         private const char SECONDARY_CSV_SEPARATOR = '-';
-
-        public static string TruncateString(string value, int maxLength)
-        {
-            return string.IsNullOrEmpty(value) ? value : value.Length <= maxLength ? value : value.Substring(0, maxLength);
-        }
 
         public static List<string> SplitCSV(string str, bool rangeCheck = false)
         {
@@ -163,12 +158,6 @@ namespace DOL.GS
         public static bool IsInRange(this Vector3 value, Vector3 target, float range)
         {
             return Vector3.DistanceSquared(value, target) <= range * range;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector2 ToVector2(this Vector3 value)
-        {
-            return new(value.X, value.Y);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

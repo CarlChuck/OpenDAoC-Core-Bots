@@ -160,13 +160,12 @@ namespace DOL.GS
                     spell.Range = 500;
                     spell.Damage = 350;
                     spell.SpellID = 11860;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = eSpellType.DirectDamageNoVariance.ToString();
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int)eDamageType.Matter;
                     m_OGDD = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_OGDD);
                 }
                 return m_OGDD;
             }
@@ -377,13 +376,12 @@ namespace DOL.AI.Brain
                     spell.Name = "Geomancer Damage Shield";
                     spell.TooltipId = 57;
                     spell.SpellID = 11717;
-                    spell.Target = "Self";
+                    spell.Target = eSpellTarget.SELF.ToString();
                     spell.Type = "DamageShield";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int) eDamageType.Heat;
                     m_OGDS = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_OGDS);
                 }
                 return m_OGDS;
             }
@@ -406,13 +404,12 @@ namespace DOL.AI.Brain
                     spell.Name = "Geomancer Root";
                     spell.TooltipId = 5089;
                     spell.SpellID = 11718;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "SpeedDecrease";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int) eDamageType.Matter;
                     m_OGRoot = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_OGRoot);
                 }
                 return m_OGRoot;
             }
@@ -437,13 +434,12 @@ namespace DOL.AI.Brain
                     spell.Name = "Olcasar Snare";
                     spell.TooltipId = 77;
                     spell.SpellID = 11862;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = eSpellType.SpeedDecrease.ToString();
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int)eDamageType.Matter;
                     m_OGAoeSnare = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_OGAoeSnare);
                 }
                 return m_OGAoeSnare;
             }
@@ -465,12 +461,11 @@ namespace DOL.AI.Brain
                     spell.Name = "Olcasar Tear";
                     spell.TooltipId = 5126;
                     spell.SpellID = 11861;
-                    spell.Target = "Self";
+                    spell.Target = eSpellTarget.SELF.ToString();
                     spell.Type = "Heal";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     m_OGBubbleEffect = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_OGBubbleEffect);
                 }
                 return m_OGBubbleEffect;
             }
@@ -632,13 +627,12 @@ namespace DOL.AI.Brain
                     spell.Message4 = "{0} recovers from the stun.";
                     spell.TooltipId = 2132;
                     spell.SpellID = 11864;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "StyleStun";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int)eDamageType.Body;
                     m_addstun = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_addstun);
                 }
                 return m_addstun;
             }

@@ -1790,12 +1790,11 @@ namespace DOL.AI.Brain
                     spell.Radius = 350;
                     spell.Duration = 120;
                     spell.SpellID = 11737;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "Disease";
                     spell.Uninterruptible = true;
                     spell.DamageType = (int)eDamageType.Body; //Energy DMG Type
                     m_black_plague = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_black_plague);
                 }
                 return m_black_plague;
             }
@@ -2434,13 +2433,12 @@ namespace DOL.AI.Brain
                     spell.Radius = 800;
                     spell.Range = 2800;
                     spell.SpellID = 11740;
-                    spell.Target = "Area";
+                    spell.Target = eSpellTarget.AREA.ToString();
                     spell.Type = "DirectDamageNoVariance";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int)eDamageType.Heat;
                     m_Apoc_Gtaoe = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Apoc_Gtaoe);
                 }
                 return m_Apoc_Gtaoe;
             }
@@ -2721,13 +2719,12 @@ namespace DOL.AI.Brain
                     spell.Radius = 600;
                     spell.Range = 2800;
                     spell.SpellID = 11738;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = eSpellType.DirectDamageNoVariance.ToString();
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int)eDamageType.Heat;
                     m_Apoc_Rain_of_Fire = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Apoc_Rain_of_Fire);
                 }
                 return m_Apoc_Rain_of_Fire;
             }

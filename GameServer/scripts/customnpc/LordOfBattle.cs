@@ -30,16 +30,16 @@ namespace DOL.GS {
             player.Out.SendMessage("Greetings, " + player.CharacterClass.Name + ".\n\n" + "If you desire, I can port you back to your realm's [event zone]", eChatType.CT_Say, eChatLoc.CL_PopupWindow);
 
             ECSGameEffect effect = EffectListService.GetEffectOnTarget(player, eEffect.ResurrectionIllness);
-            effect?.Stop();
+            effect?.End();
 
             effect = EffectListService.GetEffectOnTarget(player, eEffect.RvrResurrectionIllness);
-            effect?.Stop();
+            effect?.End();
 
             if (player.InCombatPvPInLast(8000))
                 return true;
 
             effect = EffectListService.GetEffectOnTarget(player, eEffect.Disease);
-            effect?.Stop();
+            effect?.End();
 
             player.Health = player.MaxHealth;
             player.Endurance = player.MaxEndurance;
@@ -103,7 +103,7 @@ namespace DOL.GS {
             if (playersToKill == null)
                 playersToKill = new List<GamePlayer>();
 
-            if (Body.Flags.HasFlag(GameNPC.eFlags.GHOST))
+            if ((Body.Flags & GameNPC.eFlags.GHOST) != 0)
                 return;
 
             foreach(GamePlayer player in Body.GetPlayersInRadius(7000))
@@ -119,10 +119,10 @@ namespace DOL.GS {
                 }
 
                 ECSGameEffect effect = EffectListService.GetEffectOnTarget(player, eEffect.ResurrectionIllness);
-                effect?.Stop();
+                effect?.End();
 
                 effect = EffectListService.GetEffectOnTarget(player, eEffect.RvrResurrectionIllness);
-                effect?.Stop();
+                effect?.End();
 
                 if(playersToKill.Contains(player))
                     playersToKill.Remove(player);

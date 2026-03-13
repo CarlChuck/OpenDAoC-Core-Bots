@@ -18,6 +18,10 @@ namespace DOL.GS.Spells
         protected int ChaDebuff = 0;
         protected int PieDebuff = 0;
 
+		public override string ShortDescription => $"Decreases the target's stats by {Spell.Value}%.";
+
+		public AllStatsPercentDebuff(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
+
 		public override double CalculateSpellResistChance(GameLiving target)
 		{
 			return 0;
@@ -79,18 +83,5 @@ namespace DOL.GS.Spells
 			}
 			return base.OnEffectExpires(effect, noMessages);
 		}
-
-		public override void ApplyEffectOnTarget(GameLiving target)
-		{
-			base.ApplyEffectOnTarget(target);
-
-			if (target is GameNPC)
-			{
-				IOldAggressiveBrain aggroBrain = ((GameNPC)target).Brain as IOldAggressiveBrain;
-				if (aggroBrain != null)
-					aggroBrain.AddToAggroList(Caster, (int)Spell.Value);
-			}
-		}
-        public AllStatsPercentDebuff(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
 	}
 }

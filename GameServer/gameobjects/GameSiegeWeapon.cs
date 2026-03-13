@@ -16,9 +16,10 @@ namespace DOL.GS
 	/// </summary>
 	public class GameSiegeWeapon : GameMovingObject
 	{
-		public GameSiegeWeapon()
+		public bool EnableToMove { get; set; }
+
+		public GameSiegeWeapon() : base(new BlankBrain())
 		{
-			SetOwnBrain(new BlankBrain());
 			this.Realm = 0;
 			Level = 1;
 			CurrentState = eState.Inactive;
@@ -33,7 +34,7 @@ namespace DOL.GS
 					5000,//loading
 					0//fireing
 				};//en ms
-			m_enableToMove = true;
+			EnableToMove = true;
 			MaxSpeedBase = 50;
 			MinAttackRange = -1;
 			MaxAttackRange = -1;
@@ -313,8 +314,8 @@ namespace DOL.GS
 		public void Move()
 		{
 			if (!CanUse()) return;
-			if (!m_enableToMove) return;
-			if (Owner == null || Owner.GroundTarget == null) return;
+			if (!EnableToMove) return;
+			if (Owner == null || !Owner.GroundTarget.IsValid) return;
             if ( !this.IsWithinRadius( Owner.GroundTarget, 1000 ) )
 			{
 				Owner.Out.SendMessage("Ground target is too far away to move to!", eChatType.CT_System,
@@ -393,7 +394,7 @@ namespace DOL.GS
 			}
 			if (TargetObject != null)
 				SetGroundTarget(TargetObject.X, TargetObject.Y, TargetObject.Z);
-			if (GroundTarget == null)
+			if (!GroundTarget.IsValid)
 				return;
 
 			//Range Checks
@@ -507,16 +508,15 @@ namespace DOL.GS
 		}
 		protected int[] ActionDelay;
 		private ushort m_effect;
-		private bool m_enableToMove;
 
-		/// <summary>
-		/// delay to do action in Ms
-		/// </summary>
-		/// <param name="action"></param>
-		/// <returns></returns>
-		public int GetActionDelay(SiegeTimer.eAction action)
+        /// <summary>
+        /// delay to do action in Ms
+        /// </summary>
+        /// <param name="action"></param>
+        /// <returns></returns>
+        public int GetActionDelay(SiegeTimer.eAction action)
 		{
-			if (action == SiegeTimer.eAction.Fire && GroundTarget != null)
+			if (action == SiegeTimer.eAction.Fire && GroundTarget.IsValid)
                 return (int)( ActionDelay[(int)action] + this.GetDistanceTo( GroundTarget ) );
 			
 			int delay = ActionDelay[(int)action];
@@ -536,7 +536,7 @@ namespace DOL.GS
 			if (Owner == null)
 				return false;
 			Owner.Stealth(false);
-			if (!Owner.IsAlive || Owner.IsMezzed || Owner.IsStunned)
+			if (Owner.IsIncapacitated)
 			{
 				this.Owner.Out.SendMessage("You can't use this siegeweapon now!", eChatType.CT_Say, eChatLoc.CL_SystemWindow);
 				return false;
@@ -567,17 +567,22 @@ namespace DOL.GS
 			if (SiegeWeaponTimer.IsAlive)
 			{
 				SiegeWeaponTimer.Stop();
-				if (Owner != null)
-					Owner.Out.SendSiegeWeaponCloseInterface();
+				Owner?.Out.SendSiegeWeaponCloseInterface();
 			}
+
 			SiegeWeaponTimer.Start(GetActionDelay(SiegeWeaponTimer.CurrentAction));
+
 			if (Owner != null)
 			{
-				if(this is GameSiegeRam) //Ram Siege Interface is 2 seconds fast for some reason. adding 2 seconds to the action delay for rams
-					Owner.Out.SendSiegeWeaponInterface(this, (GetActionDelay(SiegeWeaponTimer.CurrentAction) + 2000) / 100);
-				else
-				Owner.Out.SendSiegeWeaponInterface(this, GetActionDelay(SiegeWeaponTimer.CurrentAction) / 100);
+				int actionDelay = GetActionDelay(SiegeWeaponTimer.CurrentAction) / 100;
+
+				// Ram siege interface is 2 seconds faster for some reason. Adding 2 seconds to the action delay.
+				if (this is GameSiegeRam)
+					actionDelay += 20;
+
+				Owner.Out.SendSiegeWeaponInterface(this, actionDelay);
 			}
+
 			BroadcastAnimation();
 		}
 
@@ -630,14 +635,12 @@ namespace DOL.GS
 			//todo check if bullet
 			return base.ReceiveItem(source, item);
 		}
-		public override void TakeDamage(GameObject source, eDamageType damageType, int damageAmount, int criticalAmount)
+
+		public override void ModifyAttack(AttackData attackData)
 		{
-			if (source is GamePlayer)
-			{
-				damageAmount /= 30;
-				criticalAmount /= 30;
-			}
-			base.TakeDamage(source, damageType, damageAmount, criticalAmount);
+			attackData.Damage /= 30;
+			attackData.StyleDamage /= 30;
+			attackData.CriticalDamage /= 30;
 		}
 
 		public override bool Interact(GamePlayer player)
@@ -661,12 +664,6 @@ namespace DOL.GS
             this.ExamineArticle = item.ExamineArticle;
             this.MessageArticle = item.MessageArticle;
 			this.Model = (ushort)item.Model;
-		}
-
-		public bool EnableToMove
-		{
-			set { m_enableToMove = value; }
-			get { return m_enableToMove; }
 		}
 
 		public override bool AddToWorld()

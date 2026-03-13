@@ -275,12 +275,11 @@ namespace DOL.AI.Brain
 					spell.Name = "GreenSprite's Heal";
 					spell.Range = 1500;
 					spell.SpellID = 11988;
-					spell.Target = "Self";
+					spell.Target = eSpellTarget.SELF.ToString();
 					spell.Type = eSpellType.Heal.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_GreenSpriteHeal = new Spell(spell, 30);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_GreenSpriteHeal);
 				}
 				return m_GreenSpriteHeal;
 			}

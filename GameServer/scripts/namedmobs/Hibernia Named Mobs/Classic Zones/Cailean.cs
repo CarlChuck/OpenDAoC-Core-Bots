@@ -263,12 +263,11 @@ namespace DOL.AI.Brain
 					spell.Name = "Cailean's Heal";
 					spell.Range = 1500;
 					spell.SpellID = 11902;
-					spell.Target = "Self";
+					spell.Target = eSpellTarget.SELF.ToString();
 					spell.Type = eSpellType.Heal.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_CaileanHeal = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_CaileanHeal);
 				}
 				return m_CaileanHeal;
 			}
@@ -293,10 +292,9 @@ namespace DOL.AI.Brain
 					spell.Name = "Root";
 					spell.Range = 1500;
 					spell.SpellID = 11979;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.SpeedDecrease.ToString();
 					m_TreeRoot = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_TreeRoot);
 				}
 				return m_TreeRoot;
 			}
@@ -319,13 +317,12 @@ namespace DOL.AI.Brain
 					spell.Range = 1500;
 					spell.SpellID = 11980;
 					spell.Duration = 60;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "Mesmerize";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Spirit; //Spirit DMG Type
 					m_BossmezSpell = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_BossmezSpell);
 				}
 				return m_BossmezSpell;
 			}
@@ -426,10 +423,9 @@ namespace DOL.AI.Brain
 					spell.Name = "Root";
 					spell.Range = 1500;
 					spell.SpellID = 11901;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.SpeedDecrease.ToString();
 					m_TreeRoot = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_TreeRoot);
 				}
 				return m_TreeRoot;
 			}
@@ -459,14 +455,13 @@ namespace DOL.AI.Brain
 					spell.Duration = 20;
 					spell.Frequency = 40;
 					spell.SpellID = 11978;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.SpellGroup = 1800;
 					spell.EffectGroup = 1500;
 					spell.Type = eSpellType.DamageOverTime.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Matter;
 					m_CaileanTree_Dot = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_CaileanTree_Dot);
 				}
 				return m_CaileanTree_Dot;
 			}
@@ -546,7 +541,7 @@ namespace DOL.AI.Brain
                     {
 						var effect = EffectListService.GetEffectOnTarget(target, eEffect.SnareImmunity);
 						if(effect != null)
-							effect.Stop();//remove snare immunity here
+							effect.End();//remove snare immunity here
 					}
 					if(!target.effectListComponent.ContainsEffectForEffectType(eEffect.SnareImmunity) && !target.effectListComponent.ContainsEffectForEffectType(eEffect.MovementSpeedDebuff) && target != null && target.IsAlive)
 						Body.CastSpell(TreeRoot2, SkillBase.GetSpellLine(GlobalSpellsLines.Mob_Spells), false);
@@ -575,10 +570,9 @@ namespace DOL.AI.Brain
 					spell.Name = "Root";
 					spell.Range = 4500;
 					spell.SpellID = 11981;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.SpeedDecrease.ToString();
 					m_TreeRoot = new Spell(spell, 40);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_TreeRoot);
 				}
 				return m_TreeRoot;
 			}
@@ -603,10 +597,9 @@ namespace DOL.AI.Brain
 					spell.Name = "Snare";
 					spell.Range = 4500;
 					spell.SpellID = 11982;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.SpeedDecrease.ToString();
 					m_TreeRoot2 = new Spell(spell, 40);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_TreeRoot2);
 				}
 				return m_TreeRoot2;
 			}

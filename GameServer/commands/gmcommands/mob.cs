@@ -2983,10 +2983,10 @@ namespace DOL.GS.Commands
 
 			if (targetMob.Brain is StandardMobBrain standardBrain)
 			{
-				int pendingLosCheckCount = standardBrain.PendingLosCheckCount;
-				
-				if (pendingLosCheckCount != 0)
-					text.Add($"PendingLosCheckCount: {pendingLosCheckCount}");
+				int pendingAggroLosCheckCount = standardBrain.PendingAggroLosCheckCount;
+
+				if (pendingAggroLosCheckCount != 0)
+					text.Add($"PendingAggroLosCheckCount: {pendingAggroLosCheckCount}");
 
 				List<OrderedAggroListElement> aggroList = standardBrain.GetOrderedAggroList();
 
@@ -3007,20 +3007,6 @@ namespace DOL.GS.Commands
 
 				foreach (GameLiving attacker in targetMob.attackComponent.AttackerTracker.Attackers)
 					text.Add(attacker.Name);
-			}
-
-			List<ECSGameEffect> allEffects = targetMob.effectListComponent.GetEffects();
-
-			if (allEffects.Count > 0)
-			{
-				text.Add("");
-				text.Add("Effect List:");
-
-				foreach (ECSGameEffect effect in allEffects)
-				{
-					long remaining = effect.IsConcentrationEffect() ? -1 : effect.GetRemainingTimeForClient();
-					text.Add($"{effect.Name} (type: {effect.GetType()}) (remaining: {remaining}) (source: {(effect.SpellHandler == null ? targetMob.Name : effect.SpellHandler.Caster.Name)})");
-				}
 			}
 
 			client.Out.SendCustomTextWindow("Mob State", text);

@@ -85,12 +85,10 @@ namespace DOL.GS.Spells
                 RemoveEffect();
                 return;
             }
-            if ( !m_caster.IsAlive ||
+            if (m_caster.IsIncapacitated ||
                 !effect.Owner.IsAlive ||
                 m_caster.Mana < Spell.PulsePower ||
                 !m_caster.IsWithinRadius(effect.Owner, Spell.CalculateEffectiveRange(m_caster)) ||
-                m_caster.IsMezzed ||
-                m_caster.IsStunned ||
                 m_caster.TargetObject is not GameLiving ||
                 effect.Owner != (m_caster.TargetObject as GameLiving))
             {
@@ -113,7 +111,7 @@ namespace DOL.GS.Spells
 				double powerPerTarget = (double)(effect.Spell.PulsePower / m_focusTargets.Count);
 
 				int powerUsed = (int)powerPerTarget;
-				if (Util.ChanceDouble(((double)powerPerTarget - (double)powerUsed)))
+				if (Util.Chance(((double)powerPerTarget - (double)powerUsed)))
 					powerUsed += 1;
 
 				if (powerUsed > 0)
@@ -143,7 +141,7 @@ namespace DOL.GS.Spells
         {
             if (target == null) return;
             if (!target.IsAlive || target.ObjectState != GameLiving.eObjectState.Active) return;
-            if (Util.ChanceDouble(CalculateSpellResistChance(target)))
+            if (Util.Chance(CalculateSpellResistChance(target)))
             {
                 OnSpellResist(target);
                 return;
@@ -206,13 +204,6 @@ namespace DOL.GS.Spells
             {
                 target.StartInterruptTimer(target.SpellInterruptDuration, AttackData.eAttackType.Spell, Caster);
             }
-
-            if (target is GameNPC)
-            {
-                IOldAggressiveBrain aggroBrain = ((GameNPC)target).Brain as IOldAggressiveBrain;
-                if (aggroBrain != null)
-                    aggroBrain.AddToAggroList(Caster, 1);
-			}
         }
 
         public virtual void DamageTarget(AttackData ad)

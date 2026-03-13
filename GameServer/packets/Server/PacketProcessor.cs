@@ -6,8 +6,6 @@ using System.Reflection;
 using System.Threading;
 using DOL.Logging;
 using DOL.Network;
-using ECS.Debug;
-using static DOL.GS.GameClient;
 
 namespace DOL.GS.PacketHandler
 {
@@ -191,15 +189,7 @@ namespace DOL.GS.PacketHandler
 
             try
             {
-                long startTick = GameLoop.GetRealTime();
                 packetHandler.HandlePacket(_client, packet);
-                long stopTick = GameLoop.GetRealTime();
-
-                if (log.IsWarnEnabled)
-                {
-                    if (stopTick - startTick > Diagnostics.LongTickThreshold)
-                        log.Warn($"Long {nameof(PacketProcessor)}.{nameof(ProcessInboundPacket)} ({(eClientPackets) packet.Code}) for {_client.Player?.Name}({_client.Player?.ObjectID}) Time: {stopTick - startTick}ms");
-                }
             }
             catch (Exception e)
             {
@@ -213,7 +203,7 @@ namespace DOL.GS.PacketHandler
 
         public void QueuePacket(GSTCPPacketOut packet)
         {
-            if (_client.ClientState is eClientState.Disconnected or eClientState.Linkdead)
+            if (!_client.Socket.Connected)
             {
                 packet.ReleasePooledObject();
                 return;
@@ -236,7 +226,7 @@ namespace DOL.GS.PacketHandler
 
         public void QueuePacket(GSUDPPacketOut packet, bool forced)
         {
-            if (_client.ClientState is eClientState.Disconnected or eClientState.Linkdead)
+            if (!_client.Socket.Connected)
             {
                 packet.ReleasePooledObject();
                 return;
@@ -275,6 +265,9 @@ namespace DOL.GS.PacketHandler
 
         public void SendPendingPackets()
         {
+            if (!_client.Socket.Connected)
+                return;
+
             try
             {
                 _tcpPacketQueue.DrainTo(static (packet, processor) => processor.ProcessTcpPacket(packet), this);
@@ -524,11 +517,14 @@ namespace DOL.GS.PacketHandler
 
         private void SendTcpAndResetContext()
         {
-            if (!_client.Socket.Connected)
-                return;
-
             try
             {
+                if (!_client.Socket.Connected)
+                {
+                    OnFailure();
+                    return;
+                }
+
                 _sendContext.CurrentArgs.SetBuffer(0, _sendContext.Position);
 
                 if (!_client.SendAsync(_sendContext.CurrentArgs))
@@ -566,12 +562,14 @@ namespace DOL.GS.PacketHandler
 
         private void SendUdpAndResetContext()
         {
-            // Not technically needed to send UDP.
-            if (!_client.Socket.Connected)
-                return;
-
             try
             {
+                if (!_client.Socket.Connected)
+                {
+                    OnFailure();
+                    return;
+                }
+
                 _sendContext.CurrentArgs.SetBuffer(0, _sendContext.Position);
 
                 if (!GameServer.Instance.SendUdp(_sendContext.CurrentArgs))

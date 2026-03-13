@@ -229,12 +229,11 @@ namespace DOL.AI.Brain
 					spell.Range = 500;
 					spell.Value = 38;
 					spell.SpellID = 11888;
-					spell.Target = "Self";
+					spell.Target = eSpellTarget.SELF.ToString();
 					spell.Type = eSpellType.CombatSpeedBuff.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_Boss_Haste_Buff = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Boss_Haste_Buff);
 				}
 				return m_Boss_Haste_Buff;
 			}

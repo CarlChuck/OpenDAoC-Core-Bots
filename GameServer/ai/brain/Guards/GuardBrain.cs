@@ -26,7 +26,7 @@ namespace DOL.AI.Brain
 				if (player.effectListComponent.ContainsEffectForEffectType(eEffect.Shade))
 					continue;
 
-				SendLosCheckForAggro(player, player);
+				SendAggroLosCheck(player, player);
 				// We don't know if the LoS check will be positive, so we have to ask other players
 			}
 		}
@@ -40,7 +40,7 @@ namespace DOL.AI.Brain
 				if ((npc.Flags & GameNPC.eFlags.FLYING) != 0)
 					continue;
 
-				AddToAggroList(npc, npc.Level << 1);
+				AddToAggroList(npc);
 				// No LoS check, we just attack what's in range
 				return;
 			}

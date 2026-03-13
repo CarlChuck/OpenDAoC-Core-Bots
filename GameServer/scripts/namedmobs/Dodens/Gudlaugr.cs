@@ -65,7 +65,8 @@ namespace DOL.GS.Scripts
 		}
 		public override void OnAttackEnemy(AttackData ad)
 		{
-			GudlaugrBrain brain = new GudlaugrBrain();
+			GudlaugrBrain brain = Brain as GudlaugrBrain;
+
 			if (TargetObject != null)
 			{
 				if (ad.Target.IsWithinRadius(this, attackComponent.AttackRange))
@@ -178,13 +179,12 @@ namespace DOL.GS.Scripts
 						spell.Duration = 25;
 						spell.DamageType = 10;
 						spell.SpellID = 20300;
-						spell.Target = "Enemy";
+						spell.Target = eSpellTarget.ENEMY.ToString();
 						spell.MoveCast = true;
 						spell.Type = eSpellType.StyleSpeedDecrease.ToString();
 						spell.Message1 = "You begin to move more slowly!";
 						spell.Message2 = "{0} begins moving more slowly!";
 						m_Snare = new Spell(spell, 60);
-						SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Snare);
 					}
 					return m_Snare;
 				}
@@ -219,13 +219,12 @@ namespace DOL.GS.Scripts
 						spell.Damage = 100;
 						spell.DamageType = 10;
 						spell.SpellID = 20209;
-						spell.Target = "Enemy";
+						spell.Target = eSpellTarget.ENEMY.ToString();
 						spell.MoveCast = true;
 						spell.Type = eSpellType.StyleBleeding.ToString();
 						spell.Message1 = "You are bleeding! ";
 						spell.Message2 = "{0} is bleeding! ";
 						m_Bleed = new Spell(spell, 60);
-						SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Bleed);
 					}
 					return m_Bleed;
 				}

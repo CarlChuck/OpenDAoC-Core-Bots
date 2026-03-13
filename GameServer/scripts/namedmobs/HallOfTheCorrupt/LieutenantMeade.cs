@@ -195,7 +195,7 @@ namespace DOL.AI.Brain
                 var effects = Body.effectListComponent.GetPulseEffects();
 
                 for (int i = 0; i < effects.Count; i++)
-                    effects[i].Stop();//cancel here all pulse effect
+                    effects[i].End();//cancel here all pulse effect
             }
             if (Body.InCombat && HasAggro)
             {
@@ -283,7 +283,6 @@ namespace DOL.AI.Brain
                     spell.MoveCast = true;
                     spell.DamageType = (int)eDamageType.Spirit;
                     m_Meade_Pulse = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Meade_Pulse);
                 }
                 return m_Meade_Pulse;
             }

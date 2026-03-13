@@ -4,6 +4,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using DOL.Logging;
+using DOL.Timing;
 using ECS.Debug;
 
 namespace DOL.GS
@@ -22,7 +23,7 @@ namespace DOL.GS
             Instance = new();
         }
 
-        public override void Tick()
+        public override void BeginTick()
         {
             ProcessPostedActionsParallel();
 
@@ -39,25 +40,47 @@ namespace DOL.GS
                 return;
             }
 
-            GameLoop.ExecuteForEach(_list, _lastValidIndex + 1, TickInternal);
+            GameLoop.ExecuteForEach(_list, _lastValidIndex + 1, BeginTickInternal);
 
             if (Diagnostics.CheckServiceObjectCount)
                 Diagnostics.PrintServiceObjectCount(ServiceName, ref EntityCount, _list.Count);
         }
 
-        private static void TickInternal(EffectListComponent effectListComponent)
+        private static void BeginTickInternal(EffectListComponent effectListComponent)
         {
             try
             {
                 if (Diagnostics.CheckServiceObjectCount)
                     Interlocked.Increment(ref Instance.EntityCount);
 
-                long startTick = GameLoop.GetRealTime();
-                effectListComponent.Tick();
-                long stopTick = GameLoop.GetRealTime();
+                long startTick = MonotonicTime.NowMs;
+                effectListComponent.BeginTick();
+                long stopTick = MonotonicTime.NowMs;
 
                 if (stopTick - startTick > Diagnostics.LongTickThreshold)
-                    log.Warn($"Long {Instance.ServiceName}.{nameof(TickInternal)} for: {effectListComponent.Owner.Name}({effectListComponent.Owner.ObjectID}) Time: {stopTick - startTick}ms");
+                    log.Warn($"Long {Instance.ServiceName}.{nameof(BeginTickInternal)} for {effectListComponent.Owner.Name}({effectListComponent.Owner.ObjectID}) Time: {stopTick - startTick}ms");
+            }
+            catch (Exception e)
+            {
+                GameServiceUtils.HandleServiceException(e, Instance.ServiceName, effectListComponent, effectListComponent.Owner);
+            }
+        }
+
+        public override void EndTick()
+        {
+            GameLoop.ExecuteForEach(_list, _lastValidIndex + 1, EndTickInternal);
+        }
+
+        private static void EndTickInternal(EffectListComponent effectListComponent)
+        {
+            try
+            {
+                long startTick = MonotonicTime.NowMs;
+                effectListComponent.EndTick();
+                long stopTick = MonotonicTime.NowMs;
+
+                if (stopTick - startTick > Diagnostics.LongTickThreshold)
+                    log.Warn($"Long {Instance.ServiceName}.{nameof(EndTickInternal)} for {effectListComponent.Owner.Name}({effectListComponent.Owner.ObjectID}) Time: {stopTick - startTick}ms");
             }
             catch (Exception e)
             {
@@ -110,7 +133,7 @@ namespace DOL.GS
             if (effectToCancel == null)
                 return false;
 
-            return effectToCancel.Stop();
+            return effectToCancel.End();
         }
     }
 }

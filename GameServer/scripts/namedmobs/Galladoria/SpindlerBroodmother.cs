@@ -389,13 +389,12 @@ namespace DOL.AI.Brain
                     spell.Radius = 300;
                     spell.SpellID = 11716;
                     spell.Duration = 60;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "Mesmerize";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int) eDamageType.Spirit; //Spirit DMG Type
                     m_BossmezSpell = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_BossmezSpell);
                 }
                 return m_BossmezSpell;
             }

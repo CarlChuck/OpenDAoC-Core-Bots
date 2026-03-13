@@ -259,7 +259,6 @@ namespace DOL.AI.Brain
                     spell.MoveCast = true;
                     spell.DamageType = (int) eDamageType.Spirit; //Spirit DMG Type
                     m_mezSpell = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_mezSpell);
                 }
                 return m_mezSpell;
             }
@@ -284,13 +283,12 @@ namespace DOL.AI.Brain
                     spell.Name = "Kvasir's Root";
                     spell.TooltipId = 277;
                     spell.SpellID = 11741;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "SpeedDecrease";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int)eDamageType.Cold;
                     m_IssoRoot = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_IssoRoot);
                 }
                 return m_IssoRoot;
             }

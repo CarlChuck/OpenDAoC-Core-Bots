@@ -101,11 +101,10 @@ namespace DOL.AI.Brain
 					spell.Name = "Energy Blast";
 					spell.Range = 1500;
 					spell.SpellID = 11949;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					m_RylieDD = new Spell(spell, 15);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_RylieDD);
 				}
 				return m_RylieDD;
 			}
@@ -129,13 +128,12 @@ namespace DOL.AI.Brain
 					spell.Name = "Stun";
 					spell.Range = 1500;
 					spell.SpellID = 11950;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.Stun.ToString();
 					spell.DamageType = (int)eDamageType.Energy;
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_Rylie_stun = new Spell(spell, 15);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Rylie_stun);
 				}
 				return m_Rylie_stun;
 			}

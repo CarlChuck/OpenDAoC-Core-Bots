@@ -97,13 +97,12 @@ namespace DOL.GS
 					spell.Range = 450;
 					spell.Duration = 3000;//50min
 					spell.SpellID = 11822;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "Disease";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Energy; //Energy DMG Type
 					m_LydsygDisease = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_LydsygDisease);
 				}
 				return m_LydsygDisease;
 			}
@@ -176,12 +175,11 @@ namespace DOL.AI.Brain
 					spell.Value = -30;
 					spell.LifeDrainReturn = 30;
 					spell.SpellID = 11821;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.Lifedrain.ToString();
 					spell.DamageType = (int)eDamageType.Body;
 					spell.Uninterruptible = true;
 					m_Boss_Lifedrain = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Boss_Lifedrain);
 				}
 				return m_Boss_Lifedrain;
 			}

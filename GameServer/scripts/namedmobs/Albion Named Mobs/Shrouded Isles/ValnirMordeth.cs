@@ -131,7 +131,6 @@ namespace DOL.GS
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Body;
 					m_ValnirLifeDrain = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_ValnirLifeDrain);
 				}
 				return m_ValnirLifeDrain;
 			}
@@ -267,14 +266,13 @@ namespace DOL.AI.Brain
 					spell.Duration = 40;
 					spell.Frequency = 40;
 					spell.SpellID = 11903;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.SpellGroup = 1800;
 					spell.EffectGroup = 1500;
 					spell.Type = eSpellType.DamageOverTime.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Matter;
 					m_Valnir_Dot = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Valnir_Dot);
 				}
 				return m_Valnir_Dot;
 			}
@@ -301,13 +299,12 @@ namespace DOL.AI.Brain
 					spell.Range = 1500;
 					spell.Duration = 120;
 					spell.SpellID = 11904;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = "Disease";
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Energy; //Energy DMG Type
 					m_ValnirDisease = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_ValnirDisease);
 				}
 				return m_ValnirDisease;
 			}
@@ -448,7 +445,6 @@ namespace DOL.AI.Brain
 					spell.MoveCast = true;
 					spell.DamageType = (int)eDamageType.Body;
 					m_ValnirAddLifeDrain = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_ValnirAddLifeDrain);
 				}
 				return m_ValnirAddLifeDrain;
 			}

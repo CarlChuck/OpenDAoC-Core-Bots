@@ -425,12 +425,6 @@ namespace DOL.GS.Keeps
 
 		#endregion
 
-		~AbstractGameKeep()
-		{
-			log.Debug("AbstractGameKeep destructor called for " + Name);
-		}
-
-
 		#region LOAD/UNLOAD
 
 		/// <summary>
@@ -514,7 +508,7 @@ namespace DOL.GS.Keeps
 			}
 
 			RemoveFromDatabase();
-			GameServer.KeepManager.Keeps[KeepID] = null;
+			GameServer.KeepManager.UnregisterKeep(KeepID);
 		}
 
 		/// <summary>

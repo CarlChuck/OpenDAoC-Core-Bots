@@ -126,12 +126,11 @@ namespace DOL.AI.Brain
 					spell.Name = "Weno'iak Lighs";
 					spell.Range = 1500;
 					spell.SpellID = 11797;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Spirit;
 					m_Light_dd = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Light_dd);
 				}
 				return m_Light_dd;
 			}
@@ -156,12 +155,11 @@ namespace DOL.AI.Brain
 					spell.Range = 0;
 					spell.Radius = 500;
 					spell.SpellID = 11798;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.DamageType = (int)eDamageType.Spirit;
 					m_Light_pbaoe = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Light_pbaoe);
 				}
 				return m_Light_pbaoe;
 			}

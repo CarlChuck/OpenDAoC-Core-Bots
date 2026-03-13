@@ -140,13 +140,12 @@ namespace DOL.AI.Brain
                     spell.Range = 0;
                     spell.Radius = 450;
                     spell.SpellID = 11871;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = eSpellType.DirectDamageNoVariance.ToString();
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int)eDamageType.Cold;
                     m_FallingIceDD = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_FallingIceDD);
                 }
                 return m_FallingIceDD;
             }

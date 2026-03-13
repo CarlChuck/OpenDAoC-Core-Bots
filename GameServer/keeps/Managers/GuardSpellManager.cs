@@ -1,7 +1,4 @@
-using DOL.AI.Brain;
 using DOL.Database;
-using DOL.GS.PacketHandler;
-using static DOL.GS.GameObject;
 
 namespace DOL.GS.Keeps
 {
@@ -10,141 +7,6 @@ namespace DOL.GS.Keeps
 	/// </summary>
 	public class SpellMgr
 	{
-		/// <summary>
-		/// Method to check the area for heals
-		/// </summary>
-		/// <param name="guard">The guard object</param>
-		public static void CheckAreaForHeals(GameKeepGuard guard)
-		{
-			GameLiving target = null;
-			foreach (GamePlayer player in guard.GetPlayersInRadius(2000))
-			{
-				if(!player.IsAlive) continue;
-				if (GameServer.ServerRules.IsSameRealm(player, guard, true))
-				{
-					if (player.HealthPercent < 60)
-					{
-						target = player;
-						break;
-					}
-				}
-			}
-
-			if (target == null)
-			{
-				foreach (GameNPC npc in guard.GetNPCsInRadius(2000))
-				{
-					if (npc is GameSiegeWeapon) continue;
-					if (GameServer.ServerRules.IsSameRealm(npc, guard, true))
-					{
-						if (npc.HealthPercent < 60)
-						{
-							target = npc;
-							break;
-						}
-					}
-				}
-			}
-
-			if (target != null)
-			{
-				GamePlayer losChecker = null;
-
-				if (target is GamePlayer playerTarget)
-					losChecker = playerTarget;
-				else if (target is GameNPC npcTarget)
-				{
-					if (npcTarget.Brain is IControlledBrain npcTargetBrain)
-						losChecker = npcTargetBrain.GetPlayerOwner();
-					else
-					{
-						foreach (GamePlayer playerInRadius in guard.GetPlayersInRadius(WorldMgr.VISIBILITY_DISTANCE))
-						{
-							if (playerInRadius?.ObjectState == eObjectState.Active)
-								losChecker = playerInRadius;
-
-							break;
-						}
-					}
-				}
-
-				if (losChecker == null)
-					return;
-
-				if (!target.IsAlive)
-					return;
-
-				guard.TargetObject = target;
-
-				losChecker.Out.SendCheckLos(guard, target, new CheckLosResponse(guard.GuardStartSpellHealCheckLos));
-			}
-		}
-
-		/// <summary>
-		/// Method for a lord to cast a heal spell
-		/// </summary>
-		/// <param name="lord">The lord object</param>
-		public static void LordCastHealSpell(GameKeepGuard lord)
-		{
-			//decide which healing spell
-			Spell spell = GetLordHealSpell((eRealm)lord.Realm);
-			//cast the healing spell
-			if (spell != null && !lord.IsStunned && !lord.IsMezzed)
-			{
-				lord.StopAttack();
-				lord.TargetObject = lord;
-				lord.CastSpell(spell, SpellMgr.GuardSpellLine);
-			}
-		}
-
-		/// <summary>
-		/// Method to cast a heal spell
-		/// </summary>
-		/// <param name="guard">The guard object</param>
-		/// <param name="target">The spell target</param>
-		public static void CastHealSpell(GameNPC guard, GameLiving target)
-		{
-			//decide which healing spell
-			Spell spell = GetGuardHealSmallSpell((eRealm)guard.Realm);
-			//cast the healing spell
-			if (spell != null && !guard.IsStunned && !guard.IsMezzed  )
-			{
-				guard.StopAttack();
-				guard.TargetObject = target;
-				guard.CastSpell(spell, SpellMgr.GuardSpellLine);
-			}
-		}
-
-		public static Spell GetLordHealSpell(eRealm realm)
-		{
-			switch (realm)
-			{
-				case eRealm.None:
-				case eRealm.Albion:
-						return AlbLordHealSpell;
-				case eRealm.Midgard:
-						return MidLordHealSpell;
-				case eRealm.Hibernia:
-						return HibLordHealSpell;
-			}
-			return null;
-		}
-
-		public static Spell GetGuardHealSmallSpell(eRealm realm)
-		{
-			switch (realm)
-			{ 
-				case eRealm.None:
-				case eRealm.Albion:
-					return AlbGuardHealSmallSpell;
-				case eRealm.Midgard:
-					return MidGuardHealSmallSpell;
-				case eRealm.Hibernia:
-					return HibGuardHealSmallSpell;
-			}
-			return null;
-		}
-
 		#region Spells and Spell Line
 
 		private static SpellLine m_GuardSpellLine;
@@ -184,7 +46,7 @@ namespace DOL.GS.Keeps
 					spell.Name = "Guard Heal";
                     spell.Range = 2000;
 					spell.SpellID = 90001;
-					spell.Target = "Realm";
+					spell.Target = eSpellTarget.REALM.ToString();
 					spell.Type = "Heal";
 					spell.Uninterruptible = true;
 					m_albLordHealSpell = new Spell(spell, 50);
@@ -210,7 +72,7 @@ namespace DOL.GS.Keeps
 					spell.Name = "Guard Heal";
                     spell.Range = 2000;
 					spell.SpellID = 90002;
-					spell.Target = "Realm";
+					spell.Target = eSpellTarget.REALM.ToString();
 					spell.Type = "Heal";
 					spell.Uninterruptible = true;
 					m_midLordHealSpell = new Spell(spell, 50);
@@ -236,7 +98,7 @@ namespace DOL.GS.Keeps
 					spell.Name = "Guard Heal";
                     spell.Range = 2000;
 					spell.SpellID = 90003;
-					spell.Target = "Realm";
+					spell.Target = eSpellTarget.REALM.ToString();
 					spell.Type = "Heal";
 					spell.Uninterruptible = true;
 					m_hibLordHealSpell = new Spell(spell, 50);
@@ -266,7 +128,7 @@ namespace DOL.GS.Keeps
 					spell.Name = "Guard Heal";
 					spell.Range = 2000;
 					spell.SpellID = 90004;
-					spell.Target = "Realm";
+					spell.Target = eSpellTarget.REALM.ToString();
 					spell.Type = "Heal";
 					m_albGuardHealSmallSpell = new Spell(spell, 50);
 				}
@@ -291,7 +153,7 @@ namespace DOL.GS.Keeps
 					spell.Name = "Guard Heal";
                     spell.Range = 2000;
 					spell.SpellID = 90005;
-					spell.Target = "Realm";
+					spell.Target = eSpellTarget.REALM.ToString();
 					spell.Type = "Heal";
 					m_midGuardHealSmallSpell = new Spell(spell, 50);
 				}
@@ -316,7 +178,7 @@ namespace DOL.GS.Keeps
 					spell.Name = "Guard Heal";
                     spell.Range = 2000;
 					spell.SpellID = 90006;
-					spell.Target = "Realm";
+					spell.Target = eSpellTarget.REALM.ToString();
 					spell.Type = "Heal";
 					m_hibGuardHealSmallSpell = new Spell(spell, 50);
 				}
@@ -347,7 +209,7 @@ namespace DOL.GS.Keeps
                     spell.Name = "Bolt";
                     spell.Range = 2000;
                     spell.SpellID = 90017;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "Bolt";
                     spell.AllowBolt = true;
                     m_albGuardBoltSpellPortalKeep = new Spell(spell, 50);
@@ -375,7 +237,7 @@ namespace DOL.GS.Keeps
                     spell.Name = "Bolt";
                     spell.Range = 2000;
                     spell.SpellID = 90018;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "Bolt";
                     spell.AllowBolt = true;
                     m_midGuardBoltSpellPortalKeep = new Spell(spell, 50);
@@ -403,7 +265,7 @@ namespace DOL.GS.Keeps
                     spell.Name = "Bolt";
                     spell.Range = 2000;
                     spell.SpellID = 90019;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "Bolt";
                     spell.AllowBolt = true;
                     m_hibGuardBoltSpellPortalKeep = new Spell(spell, 50);
@@ -435,7 +297,7 @@ namespace DOL.GS.Keeps
                     spell.Name = "Nuke";
                     spell.Range = 1500;
                     spell.SpellID = 90014;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "DirectDamage";
                     m_albGuardNukeSpell = new Spell(spell, 50);
                 }
@@ -462,7 +324,7 @@ namespace DOL.GS.Keeps
                     spell.Name = "Nuke";
                     spell.Range = 1500;
                     spell.SpellID = 90015;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "DirectDamage";
                     m_midGuardNukeSpell = new Spell(spell, 50);
                 }
@@ -489,7 +351,7 @@ namespace DOL.GS.Keeps
                     spell.Name = "Nuke";
                     spell.Range = 1500;
                     spell.SpellID = 90016;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "DirectDamage";
                     m_hibGuardNukeSpell = new Spell(spell, 50);
                 }

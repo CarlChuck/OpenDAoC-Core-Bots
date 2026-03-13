@@ -25,7 +25,7 @@ namespace DOL.GS.RealmAbilities
             SendCasterSpellEffectAndCastMessage(player, 7009, true);
             DisableSkill(player);
 
-            ECSGameEffectFactory.Create(new(player, m_duration, 1, CreateSpell(player)), static (in ECSGameEffectInitParams i) => new AtlasOF_BatteryOfLifeECSEffect(i));
+            ECSGameEffectFactory.Create(new(player, m_duration, 1, CreateSpell(player)), static (in i) => new AtlasOF_BatteryOfLifeECSEffect(i));
         }
         
         private SpellHandler CreateSpell(GameLiving owner)
@@ -37,7 +37,7 @@ namespace DOL.GS.RealmAbilities
             tmpSpell.Damage = 0;
             tmpSpell.Concentration = 1;
             tmpSpell.DamageType = 0;
-            tmpSpell.Target = "Self";
+            tmpSpell.Target = eSpellTarget.SELF.ToString();
             tmpSpell.Radius = 0;
             tmpSpell.Type = eSpellType.DefensiveProc.ToString();
             tmpSpell.Value = 0;

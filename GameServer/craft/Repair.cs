@@ -87,27 +87,17 @@ namespace DOL.GS
 
 			if (Util.Chance(CalculateSuccessChances(player, item)))
 			{
-				int toRecoverCond = (int)((item.MaxCondition - item.Condition) * 0.01 / item.MaxCondition) + 1;
-				if (toRecoverCond >= item.Durability)
+				if (ModifyConditionAndDurability(item))
 				{
-					item.Condition += (int)(item.Durability * item.MaxCondition / 0.01);
-					item.Durability = 0;
+					player.Out.SendInventorySlotsUpdate([(eInventorySlot) item.SlotPosition]);
+					player.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "Repair.Proceed.FullyRepaired1", item.Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
+					tradePartner?.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "Repair.Proceed.FullyRepaired2", player.Name, item.Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
 				}
-				else
-				{
-					item.Condition = item.MaxCondition;
-					item.Durability -= toRecoverCond;
-				}
-
-				player.Out.SendInventorySlotsUpdate([(eInventorySlot) item.SlotPosition]);
-
-				player.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "Repair.Proceed.FullyRepaired1", item.Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
-				if (tradePartner != null) tradePartner.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "Repair.Proceed.FullyRepaired2", player.Name, item.Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
 			}
 			else
 			{
 				player.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "Repair.Proceed.FailImprove1", item.Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
-				if (tradePartner != null) tradePartner.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "Repair.Proceed.FailImprove2", player.Name, item.Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
+				tradePartner?.Out.SendMessage(LanguageMgr.GetTranslation(player.Client.Account.Language, "Repair.Proceed.FailImprove2", player.Name, item.Name), eChatType.CT_System, eChatLoc.CL_SystemWindow);
 			}
 
 			return 0;
@@ -193,6 +183,17 @@ namespace DOL.GS
 				chancePercent = 0;
 
 			return chancePercent;
+		}
+
+		public static bool ModifyConditionAndDurability(DbInventoryItem item)
+		{
+			int repairAmount = Math.Min(item.MaxCondition - item.Condition, item.Durability);
+			item.Condition += repairAmount;
+
+			if (!item.IsNotLosingDur)
+				item.Durability -= repairAmount;
+
+			return repairAmount > 0;
 		}
 
 		#endregion

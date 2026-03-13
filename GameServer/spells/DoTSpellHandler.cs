@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using DOL.AI.Brain;
 using DOL.GS.Effects;
 using DOL.GS.PacketHandler;
@@ -10,14 +11,17 @@ namespace DOL.GS.Spells
     [SpellHandler(eSpellType.DamageOverTime)]
     public class DoTSpellHandler : SpellHandler
     {
-        public int CriticalDamage { get; protected set; }
-        public bool FirstTick { get; private set; } = true;
+        private const int UNITIALIZED_CRIT_PERCENT = -1;
+
+        private Dictionary<GameLiving, double> _criticalDamagePercentByTarget = new();
+
+        public override string ShortDescription => $"Inflicts {Spell.Damage} {Spell.DamageTypeToString()} damage every {Spell.Frequency / 1000.0} seconds for {Spell.Duration / 1000.0} seconds.";
 
         public DoTSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
 
         public override ECSGameSpellEffect CreateECSEffect(in ECSGameEffectInitParams initParams)
         {
-            return ECSGameEffectFactory.Create(initParams, static (in ECSGameEffectInitParams i) => new DamageOverTimeECSGameEffect(i));
+            return ECSGameEffectFactory.Create(initParams, static (in i) => new DamageOverTimeECSGameEffect(i));
         }
 
         public override void FinishSpellCast(GameLiving target)
@@ -38,7 +42,18 @@ namespace DOL.GS.Spells
 
         public override bool HasConflictingEffectWith(ISpellHandler compare)
         {
-            return Spell.SpellType == compare.Spell.SpellType && Spell.DamageType == compare.Spell.DamageType && SpellLine.IsBaseLine == compare.SpellLine.IsBaseLine;
+            if (Spell.EffectGroup != 0 || compare.Spell.EffectGroup != 0)
+                return Spell.EffectGroup == compare.Spell.EffectGroup;
+
+            if (Spell.SpellType != compare.Spell.SpellType)
+                return false;
+
+            // For Cabalist, Bonedancer and Mentalist, we know that one baseline and one specline DoT can coexist.
+            // However, this doesn't apply to Shaman's DoTs before 1.90. Meaning a simple check on the spell line is not enough.
+            // Checking the frequency instead preserves the ability for those classes to have one baseline and one specline DoT coexist, excepted Shaman.
+            // Other rules are unknown: Poison vs spell DoTs vs procs vs other specializations lines...
+            // Damage type appears to be irrelevant and simply a guess based on the fact that some weapon procs should stack with poisons.
+            return Spell.Frequency == compare.Spell.Frequency;
         }
 
         public override AttackData CalculateDamageToTarget(GameLiving target)
@@ -72,8 +87,8 @@ namespace DOL.GS.Spells
             else
                 MessageToCaster(string.Format(LanguageMgr.GetTranslation(player.Client, "DoTSpellHandler.SendDamageMessages.YourHitsFor", Spell.Name, ad.Target.GetName(0, false), ad.Damage)), eChatType.CT_Spell);
 
-            if (CriticalDamage > 0)
-                MessageToCaster($"You critically hit for an additional {CriticalDamage} damage! ({m_caster.DebuffCriticalChance}%)", eChatType.CT_Spell);
+            if (ad.CriticalDamage > 0)
+                MessageToCaster($"You critically hit for an additional {ad.CriticalDamage} damage! ({m_caster.DebuffCriticalChance}%)", eChatType.CT_Spell);
         }
 
         public override void ApplyEffectOnTarget(GameLiving target)
@@ -121,41 +136,57 @@ namespace DOL.GS.Spells
             return 0;
         }
 
+        public override List<GameLiving> SelectTargets(GameObject castTarget)
+        {
+            // Intercept the target list for critical damage percent calculation, which will be reused on each tick.
+            List<GameLiving> _targets = base.SelectTargets(castTarget);
+            _criticalDamagePercentByTarget = new();
+
+            foreach (GameLiving target in _targets)
+                _criticalDamagePercentByTarget[target] = UNITIALIZED_CRIT_PERCENT;
+
+            return _targets;
+        }
+
         public override void OnDirectEffect(GameLiving target)
         {
             if (target == null || !target.IsAlive || target.ObjectState is not eObjectState.Active)
                 return;
 
             AttackData ad = CalculateDamageToTarget(target);
-            ad.CriticalDamage = CalculateCriticalDamage(ad);
-            ad.CausesCombat = FirstTick;
+
+            if (!_criticalDamagePercentByTarget.TryGetValue(target, out double criticalDamagePercent))
+                return; // Shouldn't happen.
+
+            if (criticalDamagePercent == UNITIALIZED_CRIT_PERCENT)
+            {
+                // First tick.
+                criticalDamagePercent = CalculateCriticalDamagePercent(ad);
+                _criticalDamagePercentByTarget[target] = criticalDamagePercent;
+                ad.CausesCombat = true;
+            }
+            else
+                ad.CausesCombat = false;
+
+            ad.CriticalDamage = (int) (ad.Damage * criticalDamagePercent);
             SendDamageMessages(ad);
             DamageTarget(ad, false);
-
-            if (FirstTick)
-                FirstTick = false;
         }
 
-        private int CalculateCriticalDamage(AttackData ad)
+        public bool IsFirstTick(GameLiving target)
         {
-            if (CriticalDamage > 0 || !FirstTick)
-                return CriticalDamage;
+            return _criticalDamagePercentByTarget.TryGetValue(target, out double criticalDamagePercent) && criticalDamagePercent == UNITIALIZED_CRIT_PERCENT;
+        }
 
+        private double CalculateCriticalDamagePercent(AttackData ad)
+        {
             ad.CriticalChance = Math.Min(50, Caster.DebuffCriticalChance);
 
-            if (ad.CriticalChance <= 0)
+            if (!Caster.Chance(RandomDeckEvent.CriticalChance, ad.CriticalChance))
                 return 0;
 
-            double randNum = Util.RandomDouble() * 100;
-
-            if (Caster is GamePlayer playerCaster && playerCaster.UseDetailedCombatLog)
-                playerCaster.Out.SendMessage($"dot crit chance: {ad.CriticalChance:0.##} random: {randNum:0.##}", eChatType.CT_DamageAdd, eChatLoc.CL_SystemWindow);
-
             // Crit damage for DoTs is up to 100% against players too.
-            if (ad.CriticalChance > randNum && ad.Damage > 0)
-                CriticalDamage = Util.Random(ad.Damage / 10, ad.Damage);
-
-            return CriticalDamage;
+            return 0.1 + Caster.GetPseudoDoubleIncl(RandomDeckEvent.CriticalVariance) * 0.9;
         }
 
         protected override double CalculateBuffDebuffEffectiveness()

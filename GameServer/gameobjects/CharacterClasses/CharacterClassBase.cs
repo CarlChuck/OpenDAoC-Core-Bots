@@ -375,14 +375,14 @@ namespace DOL.GS
 			if (effect != null)
 				return false;
 
-			effect = ECSGameEffectFactory.Create(new(Player, 0, 1), static (in ECSGameEffectInitParams i) => new ShadeECSGameEffect(i));
+			effect = ECSGameEffectFactory.Create(new(Player, 0, 1), static (in i) => new ShadeECSGameEffect(i));
 			return effect.IsActive;
 		}
 
 		public virtual bool CancelShadeEffect(out ECSGameAbilityEffect effect)
 		{
 			effect = EffectListService.GetAbilityEffectOnTarget(Player, eEffect.Shade);
-			return effect != null && effect.Stop();
+			return effect != null && effect.End();
 		}
 
 		public virtual bool Shade(bool makeShade, out ECSGameAbilityEffect effect)

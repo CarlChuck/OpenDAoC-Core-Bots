@@ -22,7 +22,7 @@ namespace DOL.GS.RealmAbilities
 
             DisableSkill(living);
 
-            ECSGameEffectFactory.Create(new(player, m_duration, Level, CreateSpell(living)), static (in ECSGameEffectInitParams i) => new AtlasOF_MajesticWillECSEffect(i));
+            ECSGameEffectFactory.Create(new(player, m_duration, Level, CreateSpell(living)), static (in i) => new AtlasOF_MajesticWillECSEffect(i));
         }
         
         private SpellHandler CreateSpell(GameLiving owner)
@@ -33,7 +33,7 @@ namespace DOL.GS.RealmAbilities
             tmpSpell.ClientEffect = 7065;
             tmpSpell.Damage = 0;
             tmpSpell.DamageType = 0;
-            tmpSpell.Target = "Self";
+            tmpSpell.Target = eSpellTarget.SELF.ToString();
             tmpSpell.Radius = 0;
             tmpSpell.Type = eSpellType.OffensiveProc.ToString();
             tmpSpell.Value = 0;

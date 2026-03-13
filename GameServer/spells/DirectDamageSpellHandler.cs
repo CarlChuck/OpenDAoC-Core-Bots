@@ -1,16 +1,11 @@
-using System;
-using DOL.AI.Brain;
-using DOL.Events;
-using DOL.GS.PacketHandler;
-
 namespace DOL.GS.Spells
 {
 	[SpellHandler(eSpellType.DirectDamage)]
 	public class DirectDamageSpellHandler : SpellHandler
 	{
-		private static readonly Logging.Logger log = Logging.LoggerManager.Create(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+		public override string ShortDescription => $"Inflicts {Spell.Damage} {Spell.DamageTypeToString()} damage to the target.";
 
-		private bool m_castFailed = false;
+		public DirectDamageSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) { }
 
 		/// <summary>
 		/// Execute direct damage spell
@@ -18,11 +13,7 @@ namespace DOL.GS.Spells
 		/// <param name="target"></param>
 		public override void FinishSpellCast(GameLiving target)
 		{
-			if (!m_castFailed)
-			{
-				m_caster.Mana -= PowerCost(target);
-			}
-
+			m_caster.Mana -= PowerCost(target);
 			base.FinishSpellCast(target);
 		}
 
@@ -54,7 +45,6 @@ namespace DOL.GS.Spells
 			return base.CalculateDamageBase(target);
 		}
 
-
 		public override double DamageCap(double effectiveness)
 		{
 			if (Spell.Damage < 0)
@@ -73,57 +63,17 @@ namespace DOL.GS.Spells
 			// 1.65 compliance. No LoS check on PBAoE or AoE spells.
 			if (Spell.Target is eSpellTarget.CONE)
 			{
-				GamePlayer checkPlayer = null;
-
-				if (target is GamePlayer)
-					checkPlayer = target as GamePlayer;
-				else
-				{
-					if (Caster is GamePlayer)
-						checkPlayer = Caster as GamePlayer;
-					else if (Caster is GameNPC npcCaster && npcCaster.Brain is IControlledBrain npcCasterBrain)
-						checkPlayer = npcCasterBrain.GetPlayerOwner();
-				}
-
-				if (checkPlayer != null)
-					checkPlayer.Out.SendCheckLos(Caster, target, new CheckLosResponse(DealDamageCheckLos));
-				else
+				if (!Caster.castingComponent.StartEndOfCastLosCheck(target, this))
 					DealDamage(target);
 			}
 			else
 				DealDamage(target);
 		}
 
-		protected virtual void DealDamageCheckLos(GamePlayer player, LosCheckResponse response, ushort sourceOID, ushort targetOID)
+		public override void OnEndOfCastLosCheck(GameLiving target, LosCheckResponse response)
 		{
 			if (response is LosCheckResponse.True)
-			{
-				try
-				{
-					GameLiving target = Caster.CurrentRegion.GetObject(targetOID) as GameLiving;
-					if (target != null)
-					{
-						DealDamage(target);
-						// Due to LOS check delay the actual cast happens after FinishSpellCast does a notify, so we notify again
-						GameEventMgr.Notify(GameLivingEvent.CastFinished, m_caster, new CastingEventArgs(this, target, m_lastAttackData));
-					}
-				}
-				catch (Exception e)
-				{
-					m_castFailed = true;
-
-					if (log.IsErrorEnabled)
-						log.Error(string.Format("targetOID:{0} caster:{1} exception:{2}", targetOID, Caster, e));
-				}
-			}
-			else
-			{
-				if (Spell.Target == eSpellTarget.ENEMY && Spell.Radius == 0 && Spell.Range != 0)
-				{
-					m_castFailed = true;
-					MessageToCaster("You can't see your target!", eChatType.CT_SpellResisted);
-				}
-			}
+				DealDamage(target);
 		}
 
 		protected virtual void DealDamage(GameLiving target)
@@ -136,8 +86,5 @@ namespace DOL.GS.Spells
 			DamageTarget(ad, true);
 			target.StartInterruptTimer(target.SpellInterruptDuration, ad.AttackType, Caster);
 		}
-
-		// constructor
-		public DirectDamageSpellHandler(GameLiving caster, Spell spell, SpellLine line) : base(caster, spell, line) {}
 	}
 }

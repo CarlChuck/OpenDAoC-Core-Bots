@@ -261,9 +261,9 @@ namespace DOL.GS.PacketHandler
 					pak.WriteShortLowEndian((ushort) (distanceWeapon != null ? distanceWeapon.Model : 0));
 
 					pak.WriteByte((byte) character.Strength);
-					pak.WriteByte((byte) character.Quickness);
-					pak.WriteByte((byte) character.Constitution);
 					pak.WriteByte((byte) character.Dexterity);
+					pak.WriteByte((byte) character.Constitution);
+					pak.WriteByte((byte) character.Quickness);
 					pak.WriteByte((byte) character.Intelligence);
 					pak.WriteByte((byte) character.Piety);
 					pak.WriteByte((byte) character.Empathy);
@@ -365,7 +365,7 @@ namespace DOL.GS.PacketHandler
 				pak.WriteByte((byte)(wd % 256));
 				pak.WriteByte(0x00);
 				// weaponskill
-				int ws = m_gameClient.Player.DisplayedWeaponSkill;
+				int ws = m_gameClient.Player.GetDisplayedWeaponSkill();
 				pak.WriteByte((byte)(ws >> 8));
 				pak.WriteByte(0x00);
 				pak.WriteByte((byte)(ws & 0xff));

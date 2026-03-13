@@ -152,12 +152,11 @@ namespace DOL.AI.Brain
 					spell.Name = "Curengkur's Strike";
 					spell.Range = 1500;
 					spell.SpellID = 11903;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_CurengkurDD = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_CurengkurDD);
 				}
 				return m_CurengkurDD;
 			}
@@ -192,7 +191,6 @@ namespace DOL.AI.Brain
 					spell.DamageType = (int)eDamageType.Body;
 					spell.Uninterruptible = true;
 					m_CurengkurPoison = new Spell(spell, 70);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_CurengkurPoison);
 				}
 				return m_CurengkurPoison;
 			}
@@ -279,12 +277,11 @@ namespace DOL.AI.Brain
 					spell.Range = 0;
 					spell.Radius = 800;
 					spell.SpellID = 11903;
-					spell.Target = "Enemy";
+					spell.Target = eSpellTarget.ENEMY.ToString();
 					spell.Type = eSpellType.DirectDamageNoVariance.ToString();
 					spell.Uninterruptible = true;
 					spell.MoveCast = true;
 					m_CurengkurDD2 = new Spell(spell, 60);
-					SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_CurengkurDD2);
 				}
 				return m_CurengkurDD2;
 			}

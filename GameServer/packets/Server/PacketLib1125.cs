@@ -187,7 +187,7 @@ namespace DOL.GS.PacketHandler
 							}
 							if (locationDescription.Length > 23) // location name over 23 chars has to be truncated eg. "The Great Pyramid of Stygia"
 							{
-								locationDescription = (locationDescription.Substring(0, 20)) + "...";
+								locationDescription = string.Concat(locationDescription.AsSpan(0, 20), "...");
 							}
 							pak.WritePascalStringIntLE(locationDescription);
 
@@ -464,8 +464,10 @@ namespace DOL.GS.PacketHandler
 
 				byte i = 0;
 				var effects = living.effectListComponent.GetEffects();
-				if (living is GamePlayer necro && (eCharacterClass) necro.CharacterClass.ID is eCharacterClass.Necromancer && necro.HasShadeModel)
-					effects.AddRange(necro.ControlledBrain.Body.effectListComponent.GetEffects().Where(e => e.TriggersImmunity));
+
+				if (player != null && player.ControlledBrain is NecromancerPet necromancerPet)
+					effects.AddRange(necromancerPet.effectListComponent.GetEffects().Where(e => e.TriggersImmunity));
+
 				foreach (var effect in effects)//.Effects.Values)
 												//foreach (ECSGameEffect effect in effects)
 					if (effect is ECSGameEffect && !effect.IsDisabled)

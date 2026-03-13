@@ -284,16 +284,7 @@ namespace DOL.GS.Spells
                 if (player.Group != null)
                     player.Group.UpdateMember(player, false, false);
             }
-            else
-            {
-                GameNPC npc = effect.Owner as GameNPC;
-                if (npc != null)
-                {
-                    IOldAggressiveBrain aggroBrain = npc.Brain as IOldAggressiveBrain;
-                    if (aggroBrain != null)
-                        aggroBrain.AddToAggroList(Caster, 1);
-                }
-            }
+
             return 0;
         }
 
@@ -348,6 +339,8 @@ namespace DOL.GS.Spells
     [SpellHandler(eSpellType.EffectivenessDebuff)]
     public class EffectivenessDeBuff : MasterlevelHandling
     {
+        public override string ShortDescription => $"Point blank area effect shout that reduces effective spec of enemies by {Spell.Value}% for determining variance for spell and melee damage.";
+
         /// <summary>
         /// called after normal spell cast is completed and effect has to be started
         /// </summary>

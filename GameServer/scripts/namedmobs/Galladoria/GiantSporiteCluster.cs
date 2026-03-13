@@ -176,13 +176,12 @@ namespace DOL.AI.Brain
                     spell.Radius = 200;
                     spell.Range = 600;
                     spell.SpellID = 11709;
-                    spell.Target = "Enemy";
+                    spell.Target = eSpellTarget.ENEMY.ToString();
                     spell.Type = "DirectDamage";
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int) eDamageType.Cold;
                     m_GSCAoe = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_GSCAoe);
                 }
 
                 return m_GSCAoe;

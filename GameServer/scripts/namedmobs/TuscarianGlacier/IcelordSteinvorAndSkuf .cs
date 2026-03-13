@@ -674,13 +674,12 @@ namespace DOL.GS
                     spell.Radius = 350;
                     spell.Range = 1800;
                     spell.SpellID = 11747;
-                    spell.Target = "Area";
+                    spell.Target = eSpellTarget.AREA.ToString();
                     spell.Type = eSpellType.DirectDamageNoVariance.ToString();
                     spell.Uninterruptible = true;
                     spell.MoveCast = true;
                     spell.DamageType = (int)eDamageType.Cold;
                     m_Icelord_Gtaoe = new Spell(spell, 70);
-                    SkillBase.AddScriptedSpell(GlobalSpellsLines.Mob_Spells, m_Icelord_Gtaoe);
                 }
                 return m_Icelord_Gtaoe;
             }
