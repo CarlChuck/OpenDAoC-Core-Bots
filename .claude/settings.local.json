@@ -76,7 +76,8 @@
       "Bash(grep -n \"public.*ActiveWeaponSlot\" GameServer/gameobjects/GameLiving.cs 2>/dev/null | head -5)",
       "Bash(grep -n \"public virtual IGameInventory\" GameServer/gameobjects/*.cs 2>/dev/null)",
       "Bash(grep -n \"public.*Group.*{\" GameServer/gameobjects/*.cs 2>/dev/null | grep -i \"GameLiving\\\\|GamePlayer\")",
-      "Bash(grep -n \"public.*AttackComponent\\\\|public.*RangeAttackComponent\\\\|public.*StyleComponent\\\\|public.*EffectListComponent\" GameServer/gameobjects/*.cs | grep -v \"field\\\\|private\\\\|override void\" | head -20)"
+      "Bash(grep -n \"public.*AttackComponent\\\\|public.*RangeAttackComponent\\\\|public.*StyleComponent\\\\|public.*EffectListComponent\" GameServer/gameobjects/*.cs | grep -v \"field\\\\|private\\\\|override void\" | head -20)",
+      "Bash(grep -n \"class ABrain\\\\|class.*Brain\" /f/_DaoC/OpenDaoCBots-Git/OpenDAoC-Core-Bots/GameServer/ai/brain/*.cs | grep -E \"ABrain|ControlledMobBrain|StandardMobBrain\")"
     ]
   }
 }

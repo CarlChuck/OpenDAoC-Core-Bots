@@ -891,6 +891,15 @@ namespace DOL.GS
             return true;
         }
 
+        public override void OnAttackedByEnemy(AttackData ad)
+        {
+            // Notify BotBrain of the attack so it can add aggro and transition to combat state
+            if (Brain is BotBrain botBrain)
+                botBrain.OnAttackedByEnemy(ad);
+
+            base.OnAttackedByEnemy(ad);
+        }
+
         #endregion
 
         #region Race and Realm

@@ -394,7 +394,7 @@ namespace DOL.AI.Brain
                     break;
             }
 
-            if (FSM.GetState(eFSMStateType.AGGRO) != FSM.GetCurrentState() && !IsHealer)
+            if (FSM.GetState(eFSMStateType.AGGRO) != FSM.GetCurrentState())
                 FSM.SetCurrentState(eFSMStateType.AGGRO);
         }
 
@@ -491,6 +491,16 @@ namespace DOL.AI.Brain
 
                 if (_brain.BotBody?.Owner != null && _brain.BotBody.Owner.IsAlive)
                 {
+                    // Check if owner is attacking something
+                    if (_brain.BotBody.Owner.TargetObject is GameLiving ownerTarget
+                        && (_brain.BotBody.Owner.IsAttacking || (_brain.BotBody.Owner.IsCasting && _brain.BotBody.Owner.castingComponent?.SpellHandler?.Spell?.IsHarmful == true))
+                        && _brain.CanAggroTarget(ownerTarget))
+                    {
+                        _brain.AddToAggroList(ownerTarget, 1);
+                        _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
+                        return;
+                    }
+
                     if (!_brain.Body.IsWithinRadius(_brain.BotBody.Owner, BotManager.MAX_FOLLOW_DISTANCE))
                     {
                         _brain.FSM.SetCurrentState(eFSMStateType.FOLLOW);
@@ -519,9 +529,6 @@ namespace DOL.AI.Brain
             {
                 _brain.AlreadyCheckedHeals = false;
 
-                if (_brain.CheckHeals())
-                    return;
-
                 if (_brain.HasAggro)
                 {
                     _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
@@ -540,6 +547,7 @@ namespace DOL.AI.Brain
                     && _brain.CanAggroTarget(ownerTarget))
                 {
                     _brain.AddToAggroList(ownerTarget, 1);
+                    _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
                     return;
                 }
 
@@ -551,7 +559,6 @@ namespace DOL.AI.Brain
                         if (member == _brain.Body || !member.IsAlive || !member.InCombat)
                             continue;
 
-                        // If a group member is in combat, check if their target is hostile
                         if (member.TargetObject is GameLiving memberTarget
                             && memberTarget.IsAlive
                             && _brain.CanAggroTarget(memberTarget)
@@ -562,8 +569,15 @@ namespace DOL.AI.Brain
                     }
 
                     if (_brain.HasAggro)
+                    {
+                        _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
                         return;
+                    }
                 }
+
+                // No combat — heal/buff
+                if (_brain.CheckHeals())
+                    return;
 
                 if (_brain.Body.FollowTarget != _brain.BotBody.Owner)
                     _brain.Body.Follow(_brain.BotBody.Owner, BotManager.FOLLOW_DISTANCE, 5000);
@@ -618,7 +632,10 @@ namespace DOL.AI.Brain
                 }
 
                 if (_brain.IsHealer)
-                    _brain.CheckHeals();
+                {
+                    if (!_brain.CheckHeals())
+                        _brain.AttackMostWanted();
+                }
                 else
                     _brain.AttackMostWanted();
             }
