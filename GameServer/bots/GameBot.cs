@@ -838,6 +838,10 @@ namespace DOL.GS
             var brain = new DOL.AI.Brain.BotBrain();
             brain.IsHealer = IsHealerClass();
             SetOwnBrain(brain);
+            
+            // Also set as ControlledBrain so combat system works properly
+            InitControlledBrainArray(1);
+            ControlledBrain = brain;
 
             GameEventMgr.AddHandler(Owner, GamePlayerEvent.Quit, new DOLEventHandler(OnOwnerQuit));
         }

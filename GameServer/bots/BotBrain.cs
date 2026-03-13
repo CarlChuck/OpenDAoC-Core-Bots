@@ -15,11 +15,115 @@ using DOL.Logging;
 
 namespace DOL.AI.Brain
 {
-    public class BotBrain : ABrain, IOldAggressiveBrain
+    public class BotBrain : ABrain, IOldAggressiveBrain, IControlledBrain
     {
         private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
 
         public GameBot BotBody => Body as GameBot;
+
+        #region IControlledBrain Implementation
+
+        public GameLiving Owner => BotBody?.Owner;
+
+        public eWalkState WalkState { get; protected set; } = eWalkState.Follow;
+
+        public eAggressionState AggressionState { get; set; } = eAggressionState.Defensive;
+
+        public bool IsMainPet { get; set; } = true;
+
+        public virtual void Attack(GameObject target)
+        {
+            if (AggressionState == eAggressionState.Passive)
+                AggressionState = eAggressionState.Defensive;
+
+            if (target is GameLiving livingTarget && livingTarget != Body.TargetObject)
+            {
+                AddToAggroList(livingTarget, 1);
+                FSM.SetCurrentState(eFSMStateType.AGGRO);
+
+                if (Body.IsCasting)
+                    Body.StopCurrentSpellcast();
+
+                AttackMostWanted();
+            }
+        }
+
+        public virtual void Disengage()
+        {
+            ClearAggroList();
+            FSM.SetCurrentState(eFSMStateType.FOLLOW);
+        }
+
+        public virtual void CheckAggressionStateOnPlayerOrder()
+        {
+            // Bots use their own AI logic, aggression state is managed by FSM
+        }
+
+        public virtual void Follow(GameObject target)
+        {
+            WalkState = eWalkState.Follow;
+            if (target != null)
+                Body.Follow(target, BotManager.FOLLOW_DISTANCE, BotManager.MAX_FOLLOW_DISTANCE);
+        }
+
+        public virtual void FollowOwner()
+        {
+            Follow(BotBody?.Owner);
+        }
+
+        public virtual void Stay()
+        {
+            WalkState = eWalkState.Stay;
+            Body.StopMoving();
+            FSM.SetCurrentState(eFSMStateType.IDLE);
+        }
+
+        public virtual void ComeHere()
+        {
+            if (BotBody?.Owner != null)
+            {
+                WalkState = eWalkState.ComeHere;
+                Body.StopFollowing();
+                Body.PathTo(BotBody.Owner, Body.MaxSpeed);
+            }
+        }
+
+        public virtual void Goto(GameObject target)
+        {
+            if (target != null)
+            {
+                WalkState = eWalkState.GoTarget;
+                Body.StopFollowing();
+                Body.PathTo(target, Body.MaxSpeed);
+            }
+        }
+
+        public virtual void UpdatePetWindow()
+        {
+            // Bots don't use pet windows - this is for player-controlled pets
+        }
+
+        public virtual GamePlayer GetPlayerOwner()
+        {
+            return BotBody?.Owner;
+        }
+
+        public virtual GameNPC GetNPCOwner()
+        {
+            return null; // Bots are always owned by players
+        }
+
+        public virtual GameLiving GetLivingOwner()
+        {
+            return BotBody?.Owner;
+        }
+
+        public virtual void SetAggressionState(eAggressionState state)
+        {
+            AggressionState = state;
+        }
+
+        #endregion
 
         #region IOldAggressiveBrain
 
