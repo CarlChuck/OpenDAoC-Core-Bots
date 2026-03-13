@@ -368,8 +368,11 @@ namespace DOL.AI.Brain
 
             public override void Enter()
             {
-                _brain.Body.StopFollowing();
-                _brain.Body.StopAttack();
+                if (_brain.Body != null)
+                {
+                    _brain.Body.StopFollowing();
+                    _brain.Body.StopAttack();
+                }
             }
 
             public override void Think()
