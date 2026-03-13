@@ -14,7 +14,7 @@ namespace DOL.GS
 {
     /// <summary>
     /// Interface that allows GameBot (and other NPC types) to be treated as player-like entities
-    /// by the game engine. Extracted from MimicNPC's IGamePlayer for use with the bot system.
+    /// by the game engine.
     /// </summary>
     public interface IGamePlayer
     {

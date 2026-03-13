@@ -106,6 +106,14 @@ namespace DOL.GS
                     return false;
                 }
             }
+            else if (_npcOwner.Brain is BotBrain botBrain)
+            {
+                if (botBrain.CheckSpells(BotBrain.eCheckSpellType.Offensive))
+                {
+                    _npcOwner.StopAttack();
+                    return false;
+                }
+            }
 
             if (!_npcOwner.IsAttacking)
                 return false;

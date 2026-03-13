@@ -40,10 +40,6 @@
         <DebugSymbols>true</DebugSymbols>
     </PropertyGroup>
     <ItemGroup>
-        <!-- Exclude MimicNPC reference code from compilation — used as code reference only -->
-        <Compile Remove="custom\MimicNPC\**\*.cs" />
-    </ItemGroup>
-    <ItemGroup>
         <AssemblyMetadata Include="BuildTime" Value="$(BuildTime)" />
         <PackageReference Include="discord-webhook-client" Version="4.0.5" />
         <PackageReference Include="Microsoft.AspNetCore.SpaServices.Extensions" Version="10.0.3" />

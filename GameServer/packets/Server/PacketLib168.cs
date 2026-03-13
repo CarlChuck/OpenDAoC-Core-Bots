@@ -1692,7 +1692,7 @@ namespace DOL.GS.PacketHandler
 							pak.WriteByte(0);
 						}
 						pak.WritePascalString(updateLiving.Name);
-						pak.WritePascalString(updateLiving is GamePlayer ? ((GamePlayer) updateLiving).CharacterClass.Name : "NPC");
+						pak.WritePascalString(updateLiving is IGamePlayer igp ? igp.CharacterClass.Name : "NPC");
 						//classname
 					}
 				}

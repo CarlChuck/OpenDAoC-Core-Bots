@@ -74,7 +74,7 @@ namespace DOL.GS.PacketHandler
 							pak.WriteShort(0);
 						}
 						pak.WritePascalString(living.Name);
-						pak.WritePascalString(living is GamePlayer ? ((GamePlayer)living).CharacterClass.Name : "NPC");//classname
+						pak.WritePascalString(living is IGamePlayer igp ? igp.CharacterClass.Name : "NPC");//classname
 					}
 				}
 				SendTCP(pak);
