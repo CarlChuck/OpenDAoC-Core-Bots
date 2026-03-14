@@ -16,6 +16,14 @@ using static DOL.GS.GamePlayer;
 
 namespace DOL.GS
 {
+    public enum eBotStance : byte
+    {
+        Auto = 0,
+        Melee = 1,
+        Ranged = 2,
+        Passive = 3
+    }
+
     public class GameBot : GameNPC, IGamePlayer
     {
         private static new readonly Logger log = LoggerManager.Create(typeof(GameBot));
@@ -30,6 +38,7 @@ namespace DOL.GS
         public byte GenderId { get; set; }
         public long DatabaseID { get; set; }
         public BotSpec BotSpec { get; private set; }
+        public eBotStance Stance { get; set; } = eBotStance.Auto;
         private int m_leftOverSpecPoints;
 
         #endregion

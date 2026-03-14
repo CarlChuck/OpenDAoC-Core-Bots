@@ -684,6 +684,13 @@ namespace DOL.AI.Brain
                     }
                 }
 
+                // Passive stance: heals only, no attacking
+                if (_brain.BotBody.Stance == eBotStance.Passive)
+                {
+                    _brain.CheckHeals();
+                    return;
+                }
+
                 if (_brain.IsHealer)
                 {
                     if (!_brain.CheckHeals())
@@ -754,30 +761,51 @@ namespace DOL.AI.Brain
                         return;
                     }
 
-                    // Switch weapon based on target distance before attacking
+                    // Switch weapon based on stance and target distance before attacking
                     if (Body.TargetObject is GameLiving livingTarget)
                     {
                         int distance = (int)Body.GetDistanceTo(livingTarget);
+                        var stance = BotBody.Stance;
 
-                        if (distance <= Body.MeleeAttackRange)
+                        if (stance == eBotStance.Melee)
                         {
-                            // In melee range - switch to melee if currently using ranged
+                            // Always melee - switch away from ranged if needed
                             if (Body.ActiveWeaponSlot == eActiveWeaponSlot.Distance)
                             {
-                                // Prefer two-handed if available, otherwise standard
                                 if (BotBody.Inventory.GetItem(eInventorySlot.TwoHandWeapon) != null)
                                     Body.SwitchWeapon(eActiveWeaponSlot.TwoHanded);
                                 else if (BotBody.Inventory.GetItem(eInventorySlot.RightHandWeapon) != null)
                                     Body.SwitchWeapon(eActiveWeaponSlot.Standard);
                             }
                         }
-                        else
+                        else if (stance == eBotStance.Ranged)
                         {
-                            // Out of melee range - switch to ranged if available
+                            // Prefer ranged - only go melee if in melee range and no ranged weapon
                             if (Body.ActiveWeaponSlot != eActiveWeaponSlot.Distance &&
                                 BotBody.Inventory.GetItem(eInventorySlot.DistanceWeapon) != null)
                             {
                                 Body.SwitchWeapon(eActiveWeaponSlot.Distance);
+                            }
+                        }
+                        else // Auto stance - existing distance-based behavior
+                        {
+                            if (distance <= Body.MeleeAttackRange)
+                            {
+                                if (Body.ActiveWeaponSlot == eActiveWeaponSlot.Distance)
+                                {
+                                    if (BotBody.Inventory.GetItem(eInventorySlot.TwoHandWeapon) != null)
+                                        Body.SwitchWeapon(eActiveWeaponSlot.TwoHanded);
+                                    else if (BotBody.Inventory.GetItem(eInventorySlot.RightHandWeapon) != null)
+                                        Body.SwitchWeapon(eActiveWeaponSlot.Standard);
+                                }
+                            }
+                            else
+                            {
+                                if (Body.ActiveWeaponSlot != eActiveWeaponSlot.Distance &&
+                                    BotBody.Inventory.GetItem(eInventorySlot.DistanceWeapon) != null)
+                                {
+                                    Body.SwitchWeapon(eActiveWeaponSlot.Distance);
+                                }
                             }
                         }
                     }

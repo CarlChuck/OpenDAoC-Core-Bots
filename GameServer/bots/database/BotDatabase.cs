@@ -222,7 +222,7 @@ namespace DOL.GS
                 };
 
                 settings.FollowDistance = BotManager.FOLLOW_DISTANCE;
-                settings.CombatMode = "Assist";
+                settings.CombatMode = bot.Stance.ToString();
                 settings.HealThreshold = 50;
                 settings.PreferredTarget = "Owner";
 
@@ -248,7 +248,8 @@ namespace DOL.GS
                 var settings = GameServer.Database.FindObjectByKey<BotSettings>(bot.DatabaseID);
                 if (settings != null)
                 {
-                    // TODO: Apply settings to bot
+                    if (Enum.TryParse<eBotStance>(settings.CombatMode, true, out var stance))
+                        bot.Stance = stance;
                     log.Debug($"Loaded settings for bot {bot.Name}");
                 }
             }

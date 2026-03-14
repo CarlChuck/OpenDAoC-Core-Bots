@@ -20,7 +20,8 @@ namespace DOL.GS
     "/bot follow [name]",
     "/bot stay [name]",
     "/bot hold [name]",
-    "/bot resume [name]")]
+    "/bot resume [name]",
+    "/bot stance <auto|melee|ranged|passive> [name]")]
 public class BotCommand : AbstractCommandHandler, ICommandHandler
 {
     private static readonly Logger log = LoggerManager.Create(MethodBase.GetCurrentMethod().DeclaringType);
@@ -69,6 +70,9 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
                     break;
                 case "resume":
                     HandleResume(client, args);
+                    break;
+                case "stance":
+                    HandleStance(client, args);
                     break;
                 default:
                     client.Out.SendMessage($"Unknown bot command: {subCmd}", eChatType.CT_System, eChatLoc.CL_SystemWindow);
@@ -291,6 +295,27 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
         client.Out.SendMessage($"{bot.Name} AI resumed.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
     }
 
+    private void HandleStance(GameClient client, string[] args)
+    {
+        if (args.Length < 3)
+        {
+            client.Out.SendMessage("Usage: /bot stance <auto|melee|ranged|passive> [name]", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+            return;
+        }
+
+        if (!Enum.TryParse<eBotStance>(args[2], true, out var stance))
+        {
+            client.Out.SendMessage("Valid stances: auto, melee, ranged, passive", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+            return;
+        }
+
+        var bot = ResolveBotTarget(client, args, 3);
+        if (bot == null) return;
+
+        bot.Stance = stance;
+        client.Out.SendMessage($"{bot.Name} stance set to {stance}.", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+    }
+
     private GameBot ResolveBotTarget(GameClient client, string[] args, int nameIndex)
     {
         string botName = null;
@@ -334,6 +359,7 @@ public class BotCommand : AbstractCommandHandler, ICommandHandler
         client.Out.SendMessage("/bot stay [name] → uses target if blank", eChatType.CT_System, eChatLoc.CL_SystemWindow);
         client.Out.SendMessage("/bot hold [name] → suspend AI", eChatType.CT_System, eChatLoc.CL_SystemWindow);
         client.Out.SendMessage("/bot resume [name] → resume AI", eChatType.CT_System, eChatLoc.CL_SystemWindow);
+        client.Out.SendMessage("/bot stance <auto|melee|ranged|passive> [name]", eChatType.CT_System, eChatLoc.CL_SystemWindow);
     }
 }
 }
