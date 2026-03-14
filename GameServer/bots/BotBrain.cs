@@ -208,12 +208,6 @@ namespace DOL.AI.Brain
                 }
             }
 
-            if (FSM.GetCurrentState() != FSM.GetState(eFSMStateType.AGGRO) && HasAggro && !IsHealer)
-            {
-                FSM.SetCurrentState(eFSMStateType.AGGRO);
-                NextThinkTick = GameLoop.GameLoopTime;
-            }
-
             static AggroAmount Add(GameLiving key, long arg)
             {
                 return new(Math.Max(0, arg));
@@ -545,16 +539,6 @@ namespace DOL.AI.Brain
                         return;
                     }
 
-                    // Check if owner simply has a valid target (for manual attack commands)
-                    if (_brain.BotBody.Owner.TargetObject is GameLiving manualTarget
-                        && manualTarget.IsAlive
-                        && _brain.CanAggroTarget(manualTarget))
-                    {
-                        _brain.AddToAggroList(manualTarget, 1);
-                        _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
-                        return;
-                    }
-
                     if (!_brain.Body.IsWithinRadius(_brain.BotBody.Owner, BotManager.MAX_FOLLOW_DISTANCE))
                     {
                         _brain.FSM.SetCurrentState(eFSMStateType.FOLLOW);
@@ -618,17 +602,6 @@ namespace DOL.AI.Brain
                             return;
                         }
                     }
-                }
-
-                // Check if owner simply has a valid target (for manual attack commands)
-                if (_brain.BotBody.Owner.TargetObject is GameLiving manualTarget
-                    && manualTarget.IsAlive
-                    && _brain.CanAggroTarget(manualTarget)
-                    && !_brain.HasAggro)
-                {
-                    _brain.AddToAggroList(manualTarget, 1);
-                    _brain.FSM.SetCurrentState(eFSMStateType.AGGRO);
-                    return;
                 }
 
                 // Check if any group member is being attacked
